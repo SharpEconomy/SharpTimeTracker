@@ -37,7 +37,6 @@ FIELDNAMES = [
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
 def _ensure_csv():
     if not os.path.exists(CSV_FILE):
         with open(CSV_FILE, 'w', newline='') as f:
@@ -78,9 +77,6 @@ def _ensure_csv():
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
         writer.writeheader()
         writer.writerows(converted)
-
-
-
 
 def _read_entries():
     _ensure_csv()
@@ -276,6 +272,7 @@ def edit(index):
         created = datetime.fromisoformat(created_str)
     except ValueError:
         created = datetime.now()
+
     if datetime.now() - created > timedelta(hours=24):
         flash('Editing period expired')
         return redirect(url_for('index'))
