@@ -23,25 +23,63 @@ app.secret_key = 'secret123'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+FIELDNAMES = [
+    'Name',
+    'Date',
+    'From Time',
+    'To Time',
+    'Task',
+    'Description',
+    'File',
+    'Completed',
+    'Created At',
+]
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-if not os.path.exists(CSV_FILE):
-    with open(CSV_FILE, 'w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow([
-            'Name',
-            'Date',
-            'From Time',
-            'To Time',
-            'Task',
-            'Description',
-            'File',
-            'Completed',
-            'Created At',
-        ])
+def _ensure_csv():
+    if not os.path.exists(CSV_FILE):
+        with open(CSV_FILE, 'w', newline='') as f:
+            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+            writer.writeheader()
+        return
+    with open(CSV_FILE, newline='') as f:
+        rows = list(csv.reader(f))
+    if not rows:
+        with open(CSV_FILE, 'w', newline='') as f:
+            csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
+        return
+    header = [h.strip() for h in rows[0]]
+    if header == FIELDNAMES:
+        return
+    converted = []
+    for row in rows[1:]:
+        if not row:
+            continue
+        if len(row) >= 6 and row[4].replace('.', '', 1).isdigit():
+            task = row[5] if len(row) > 5 else ''
+            desc = row[6] if len(row) > 6 else ''
+        else:
+            task = row[4] if len(row) > 4 else ''
+            desc = row[5] if len(row) > 5 else ''
+        converted.append({
+            'Name': row[0] if len(row) > 0 else '',
+            'Date': row[1] if len(row) > 1 else '',
+            'From Time': row[2] if len(row) > 2 else '',
+            'To Time': row[3] if len(row) > 3 else '',
+            'Task': task,
+            'Description': desc,
+            'File': '',
+            'Completed': '1',
+            'Created At': datetime.now().isoformat(),
+        })
+    with open(CSV_FILE, 'w', newline='') as f:
+        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+        writer.writeheader()
+        writer.writerows(converted)
 
 def _read_entries():
+    _ensure_csv()
     entries = []
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE, newline='') as file:
@@ -115,35 +153,35 @@ def add():
         filename = fname
     entries = _read_entries()
     index = len(entries)
-    row = [
-        request.form['name'],
-        today,
-        request.form['from_time'],
-        request.form['to_time'],
-        request.form['task'],
-        request.form.get('description', ''),
-        filename,
-        request.form.get('completed', '1'),
-        datetime.now().isoformat(),
-    ]
+    row = {
+        'Name': request.form['name'],
+        'Date': today,
+        'From Time': request.form['from_time'],
+        'To Time': request.form['to_time'],
+        'Task': request.form['task'],
+        'Description': request.form.get('description', ''),
+        'File': filename,
+        'Completed': request.form.get('completed', '1'),
+        'Created At': datetime.now().isoformat(),
+    }
     with open(CSV_FILE, 'a', newline='') as file:
-        writer = csv.writer(file)
+        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
         writer.writerow(row)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        hours = _hours(row[2], row[3])
+        hours = _hours(row['From Time'], row['To Time'])
         years = {datetime.strptime(r['Date'], '%Y-%m-%d').year for r in _read_entries()}
         show_year = any(y != 2025 for y in years)
         return jsonify(
             {
-                'name': row[0],
-                'date_display': _format_date(row[1], show_year),
+                'name': row['Name'],
+                'date_display': _format_date(row['Date'], show_year),
                 'hours': hours,
                 'duration_str': f"{int(hours)}h {int(round((hours-int(hours))*60))}m",
-                'task': row[4],
-                'description_html': _linkify(row[5]),
+                'task': row['Task'],
+                'description_html': _linkify(row['Description']),
                 'file_link': f'<a href="/uploads/{filename}" download target="_blank">{filename}</a>' if filename else '',
-                'completed': row[7],
+                'completed': row['Completed'],
                 'index': index,
             }
         )
@@ -227,7 +265,14 @@ def edit(index):
     if index < 0 or index >= len(entries):
         abort(404)
     row = entries[index]
-    created = datetime.fromisoformat(row.get('Created At', datetime.now().isoformat()))
+    created_str = row.get('Created At', datetime.now().isoformat())
+    if not isinstance(created_str, str):
+        created_str = str(created_str)
+    try:
+        created = datetime.fromisoformat(created_str)
+    except ValueError:
+        created = datetime.now()
+
     if datetime.now() - created > timedelta(hours=24):
         flash('Editing period expired')
         return redirect(url_for('index'))
@@ -240,7 +285,7 @@ def edit(index):
         row['Completed'] = request.form.get('completed', '1')
         entries[index] = row
         with open(CSV_FILE, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=entries[0].keys())
+            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
             writer.writeheader()
             writer.writerows(entries)
         flash('Entry updated')
