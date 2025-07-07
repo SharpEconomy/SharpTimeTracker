@@ -2,7 +2,7 @@
 <html>
 <head>
     <title>Time Tracker</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/flatly/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootswatch@5.3.0/dist/pulse/bootstrap.min.css">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -43,7 +43,7 @@
         <div class="modal-header"><h5 class="modal-title">Add Time Entry</h5></div>
         <div class="modal-body">
             <input name="name" class="form-control mb-2" placeholder="Your Name" required>
-            <input name="email" type="email" class="form-control mb-2" placeholder="Official Email" required>
+            <input type="hidden" name="date">
             <input name="from_time" type="time" class="form-control mb-2" required>
             <input name="to_time" type="time" class="form-control mb-2" required>
             <input name="task" class="form-control mb-2" placeholder="Task Name" required>
@@ -79,12 +79,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const fromField = document.querySelector('input[name="from_time"]');
     const toField = document.querySelector('input[name="to_time"]');
+    const dateField = document.querySelector('input[name="date"]');
     const modal = document.getElementById('addTimeModal');
     const setCurrentTime = () => {
         const now = new Date();
-        const timeString = now.toISOString().slice(11, 16);
+        const pad = n => n.toString().padStart(2, '0');
+        const timeString = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+        const dateString = now.toLocaleDateString('en-CA');
         if (fromField) fromField.value = timeString;
         if (toField) toField.value = timeString;
+        if (dateField) dateField.value = dateString;
     };
     if (modal) {
         modal.addEventListener('show.bs.modal', setCurrentTime);

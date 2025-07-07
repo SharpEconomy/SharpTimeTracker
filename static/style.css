@@ -3,6 +3,19 @@ body {
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
+.navbar {
+    background-color: #7b68ee !important;
+}
+
+.btn-primary {
+    background-color: #7b68ee;
+    border-color: #7b68ee;
+}
+.btn-primary:hover {
+    background-color: #6a57d5;
+    border-color: #6a57d5;
+}
+
 .navbar-brand img {
     height: 40px;
     margin-right: 10px;
