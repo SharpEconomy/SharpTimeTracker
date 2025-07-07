@@ -30,6 +30,7 @@ This is a simple Flask + Dash time tracking app using CSV as backend.
 2. Connect to [Render.com](https://render.com/)
 3. Choose "Web Service"
 4. Select `render.yaml` as setup guide
-5. Done ✅
+5. Ensure the Python version is pinned (e.g., `runtime.txt` with `python-3.11.9`)
+6. Done ✅
 
 > If you face any issues: increase instance memory, check logs, or email dev@sharpeconomy.org
