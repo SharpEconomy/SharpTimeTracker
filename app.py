@@ -80,7 +80,7 @@ def index():
 
 @app.route('/add', methods=['POST'])
 def add():
-    today = request.form.get('date') or datetime.now().strftime('%Y-%m-%d')
+    today = datetime.now().strftime('%Y-%m-%d')
     uploaded = request.files.get('file')
     filename = ''
     if uploaded and uploaded.filename:
@@ -110,8 +110,6 @@ def add():
             {
                 'name': row[0],
                 'date_display': _format_date(row[1], show_year),
-                'from_time': row[2],
-                'to_time': row[3],
                 'hours': hours,
                 'task': row[4],
                 'description_html': _linkify(row[5]),
@@ -162,7 +160,7 @@ def download():
                 e['Description'],
                 e['File'],
             ])
-    return send_file(file, as_attachment=True)
+    return send_file(file, as_attachment=True, download_name='Sharp Time Tracker.csv')
 
 @app.route('/weekly-download')
 def weekly_download():

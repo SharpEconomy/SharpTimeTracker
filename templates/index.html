@@ -20,26 +20,25 @@
 </nav>
 
 <div class="container mt-4">
-    <form id="entry-form" class="row g-2 mb-3" enctype="multipart/form-data">
+    <div class="card p-3 mb-4">
+    <form id="entry-form" class="row g-2 align-items-end" enctype="multipart/form-data">
         <div class="col-md-2"><input name="name" class="form-control" placeholder="Name" required></div>
-        <div class="col-md-2"><input name="date" type="date" class="form-control" required></div>
-        <div class="col-md-1"><input name="from_time" type="time" class="form-control" required></div>
-        <div class="col-md-1"><input name="to_time" type="time" class="form-control" required></div>
+        <div class="col-md-2"><input name="from_time" type="time" class="form-control" required></div>
+        <div class="col-md-2"><input name="to_time" type="time" class="form-control" required></div>
         <div class="col-md-2"><input name="task" class="form-control" placeholder="Task" required></div>
         <div class="col-md-3">
             <textarea name="description" class="form-control" placeholder="Description" rows="1"></textarea>
             <input type="file" name="file" class="form-control mt-1">
         </div>
         <div class="col-md-1 d-grid"><button type="submit" class="btn btn-primary">Add</button></div>
+        <input type="hidden" name="date">
     </form>
-
+    </div>
     <table class="table table-bordered table-striped">
         <thead>
             <tr>
                 <th>Name</th>
                 <th>Date</th>
-                <th>Start</th>
-                <th>End</th>
                 <th>Hours</th>
                 <th>Task</th>
                 <th>Description</th>
@@ -51,8 +50,6 @@
             <tr>
                 <td>{{ row['Name'] }}</td>
                 <td>{{ row.date_display }}</td>
-                <td>{{ row['From Time'] }}</td>
-                <td>{{ row['To Time'] }}</td>
                 <td>{{ row.hours | round(2) }}</td>
                 <td>{{ row['Task'] }}</td>
                 <td>{{ row['Description']|linkify|safe }}</td>
@@ -95,8 +92,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td>${row.name}</td>`+
                     `<td>${row.date_display}</td>`+
-                    `<td>${row.from_time}</td>`+
-                    `<td>${row.to_time}</td>`+
                     `<td>${row.hours.toFixed(2)}</td>`+
                     `<td>${row.task}</td>`+
                     `<td>${row.description_html}</td>`+
