@@ -15,86 +15,98 @@
         <div class="ms-auto">
             <a href="/download" class="btn btn-outline-light me-2">Download CSV</a>
             <a href="/report" class="btn btn-outline-light me-2">Weekly Report</a>
-            <button class="btn btn-light" data-bs-toggle="modal" data-bs-target="#addTimeModal">Add Time</button>
         </div>
     </div>
 </nav>
 
 <div class="container mt-4">
+    <form id="entry-form" class="row g-2 mb-3" enctype="multipart/form-data">
+        <div class="col-md-2"><input name="name" class="form-control" placeholder="Name" required></div>
+        <div class="col-md-2"><input name="date" type="date" class="form-control" required></div>
+        <div class="col-md-1"><input name="from_time" type="time" class="form-control" required></div>
+        <div class="col-md-1"><input name="to_time" type="time" class="form-control" required></div>
+        <div class="col-md-2"><input name="task" class="form-control" placeholder="Task" required></div>
+        <div class="col-md-3">
+            <textarea name="description" class="form-control" placeholder="Description" rows="1"></textarea>
+            <input type="file" name="file" class="form-control mt-1">
+        </div>
+        <div class="col-md-1 d-grid"><button type="submit" class="btn btn-primary">Add</button></div>
+    </form>
+
     <table class="table table-bordered table-striped">
-        <thead><tr><th>Name</th><th>Date</th><th>Hours</th></tr></thead>
-        <tbody>
+        <thead>
+            <tr>
+                <th>Name</th>
+                <th>Date</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Hours</th>
+                <th>Task</th>
+                <th>Description</th>
+                <th>File</th>
+            </tr>
+        </thead>
+        <tbody id="entry-body">
         {% for row in data %}
             <tr>
                 <td>{{ row['Name'] }}</td>
-                <td>{{ row['Date'] }}</td>
-                <td>{{ row['Hours'] | round(2) }}</td>
+                <td>{{ row.date_display }}</td>
+                <td>{{ row['From Time'] }}</td>
+                <td>{{ row['To Time'] }}</td>
+                <td>{{ row.hours | round(2) }}</td>
+                <td>{{ row['Task'] }}</td>
+                <td>{{ row['Description']|linkify|safe }}</td>
+                <td>{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
 </div>
 
-<!-- Modal -->
-<div class="modal fade" id="addTimeModal" tabindex="-1">
-  <div class="modal-dialog modal-dialog-centered">
-    <form method="POST" action="/add">
-      <div class="modal-content">
-        <div class="modal-header"><h5 class="modal-title">Add Time Entry</h5></div>
-        <div class="modal-body">
-            <input name="name" class="form-control mb-2" placeholder="Your Name" required>
-            <input type="hidden" name="date">
-            <input name="from_time" type="time" class="form-control mb-2" required>
-            <input name="to_time" type="time" class="form-control mb-2" required>
-            <input name="task" class="form-control mb-2" placeholder="Task Name" required>
-            <textarea name="description" class="form-control mb-2" placeholder="Description" rows="3" required></textarea>
-        </div>
-        <div class="modal-footer">
-            <button type="submit" class="btn btn-primary">Submit</button>
-        </div>
-      </div>
-    </form>
-  </div>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const nameField = document.querySelector('input[name="name"]');
+    const form = document.getElementById('entry-form');
+    const nameField = form.querySelector('input[name="name"]');
     let storedName = localStorage.getItem('name');
     if (!storedName) {
         storedName = prompt('Please enter your name:');
-        if (storedName) {
-            localStorage.setItem('name', storedName);
-        }
+        if (storedName) localStorage.setItem('name', storedName);
     }
-    if (storedName && nameField) {
-        nameField.value = storedName;
-    }
-    if (nameField) {
-        nameField.addEventListener('change', () => {
-            localStorage.setItem('name', nameField.value);
-        });
-    }
+    if (storedName) nameField.value = storedName;
+    nameField.addEventListener('change', () => localStorage.setItem('name', nameField.value));
 
-    const fromField = document.querySelector('input[name="from_time"]');
-    const toField = document.querySelector('input[name="to_time"]');
-    const dateField = document.querySelector('input[name="date"]');
-    const modal = document.getElementById('addTimeModal');
     const setCurrentTime = () => {
         const now = new Date();
         const pad = n => n.toString().padStart(2, '0');
         const timeString = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
         const dateString = now.toLocaleDateString('en-CA');
-        if (fromField) fromField.value = timeString;
-        if (toField) toField.value = timeString;
-        if (dateField) dateField.value = dateString;
+        form.querySelector('input[name="from_time"]').value = timeString;
+        form.querySelector('input[name="to_time"]').value = timeString;
+        form.querySelector('input[name="date"]').value = dateString;
     };
-    if (modal) {
-        modal.addEventListener('show.bs.modal', setCurrentTime);
-    } else {
-        setCurrentTime();
-    }
+    setCurrentTime();
+
+    form.addEventListener('submit', function(e){
+        e.preventDefault();
+        const data = new FormData(form);
+        fetch('/add', {method: 'POST', body: data, headers: {'X-Requested-With': 'XMLHttpRequest'}})
+            .then(r => r.json())
+            .then(row => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${row.name}</td>`+
+                    `<td>${row.date_display}</td>`+
+                    `<td>${row.from_time}</td>`+
+                    `<td>${row.to_time}</td>`+
+                    `<td>${row.hours.toFixed(2)}</td>`+
+                    `<td>${row.task}</td>`+
+                    `<td>${row.description_html}</td>`+
+                    `<td>${row.file_link}</td>`;
+                document.getElementById('entry-body').appendChild(tr);
+                form.reset();
+                if (storedName) nameField.value = storedName;
+                setCurrentTime();
+            });
+    });
 });
 </script>
 </body>
