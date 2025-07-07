@@ -1,12 +1,14 @@
 # Time Tracker App (Render-Ready)
 
-This is a simple Flask + Dash time tracking app using CSV as backend.
+This is a lightweight Flask time tracking app using a CSV file as the backend.
+Dash and pandas have been removed so installs on Render are much faster. Charts
+are now rendered client-side with Chart.js.
 
 ## Features
 - User signup (name & email)
 - Time tracking (with from–to time, task, and description)
 - Daily log viewer
-- Weekly report in charts (Dash)
+- Weekly report using Chart.js
 - CSV download (raw + weekly)
 - Sharp Economy branding
 
