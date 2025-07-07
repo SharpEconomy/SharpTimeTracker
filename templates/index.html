@@ -22,15 +22,38 @@
 <div class="container mt-4">
     <div class="card p-3 mb-4">
     <form id="entry-form" class="row g-2 align-items-end" enctype="multipart/form-data">
-        <div class="col-md-2"><input name="name" class="form-control" placeholder="Name" required></div>
-        <div class="col-md-2"><input name="from_time" type="time" class="form-control" required></div>
-        <div class="col-md-2"><input name="to_time" type="time" class="form-control" required></div>
-        <div class="col-md-2"><input name="task" class="form-control" placeholder="Task" required></div>
-        <div class="col-md-3">
-            <textarea name="description" class="form-control" placeholder="Description" rows="1"></textarea>
-            <input type="file" name="file" class="form-control mt-1">
+        <div class="col-md-2">
+            <label class="form-label">Name</label>
+            <input name="name" class="form-control" required>
         </div>
-        <div class="col-md-1 d-grid"><button type="submit" class="btn btn-primary">Add</button></div>
+        <div class="col-md-2">
+            <label class="form-label">Date</label>
+            <input name="date" type="date" class="form-control" required>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">From</label>
+            <input name="from_time" type="time" class="form-control" required>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">To</label>
+            <input name="to_time" type="time" class="form-control" required>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Task</label>
+            <input name="task" class="form-control" required>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label">Description</label>
+            <textarea name="description" class="form-control" rows="1"></textarea>
+            <input type="file" name="file" class="form-control mt-1">
+            <div class="form-check mt-1">
+                <input class="form-check-input" type="checkbox" name="completed" id="completed" checked>
+                <label class="form-check-label" for="completed">Completed</label>
+            </div>
+        </div>
+        <div class="col-md-1 d-grid">
+            <button type="submit" class="btn btn-primary mt-3">Add</button>
+        </div>
     </form>
     </div>
     <table class="table table-bordered table-striped">
@@ -38,10 +61,12 @@
             <tr>
                 <th>Name</th>
                 <th>Date</th>
-                <th>Hours</th>
+                <th>Duration</th>
                 <th>Task</th>
                 <th>Description</th>
                 <th>File</th>
+                <th>Completed</th>
+                <th></th>
             </tr>
         </thead>
         <tbody id="entry-body">
@@ -49,10 +74,12 @@
             <tr>
                 <td>{{ row['Name'] }}</td>
                 <td>{{ row.date_display }}</td>
-                <td>{{ row.hours | round(2) }}</td>
+                <td>{{ row.duration_str }}</td>
                 <td>{{ row['Task'] }}</td>
                 <td>{{ row['Description']|linkify|safe }}</td>
                 <td>{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
+                <td>{{ 'Yes' if row['Completed'] == '1' else 'No' }}</td>
+                <td><a href="/edit/{{ row.index }}" class="btn btn-sm btn-secondary">Edit</a></td>
             </tr>
         {% endfor %}
         </tbody>
@@ -74,11 +101,24 @@ document.addEventListener('DOMContentLoaded', function () {
     const setCurrentTime = () => {
         const now = new Date();
         const pad = n => n.toString().padStart(2, '0');
+        form.querySelector('input[name="date"]').value = now.toISOString().slice(0,10);
         const timeString = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
         form.querySelector('input[name="from_time"]').value = timeString;
-        form.querySelector('input[name="to_time"]').value = timeString;
+        const later = new Date(now.getTime() + 15*60000);
+        const laterStr = `${pad(later.getHours())}:${pad(later.getMinutes())}`;
+        form.querySelector('input[name="to_time"]').value = laterStr;
+    };
+    const adjustEndTime = () => {
+        const val = form.querySelector('input[name="from_time"]').value;
+        if (!val) return;
+        const [h, m] = val.split(':').map(Number);
+        const dt = new Date();
+        dt.setHours(h, m + 15);
+        const pad = n => n.toString().padStart(2, '0');
+        form.querySelector('input[name="to_time"]').value = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
     };
     setCurrentTime();
+    form.querySelector('input[name="from_time"]').addEventListener('change', adjustEndTime);
 
     form.addEventListener('submit', function(e){
         e.preventDefault();
@@ -89,10 +129,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `<td>${row.name}</td>`+
                     `<td>${row.date_display}</td>`+
-                    `<td>${row.hours.toFixed(2)}</td>`+
+                    `<td>${row.duration_str}</td>`+
                     `<td>${row.task}</td>`+
                     `<td>${row.description_html}</td>`+
-                    `<td>${row.file_link}</td>`;
+                    `<td>${row.file_link}</td>`+
+                    `<td>${row.completed === '1' ? 'Yes' : 'No'}</td>`+
+                    `<td><a href="/edit/${row.index}" class="btn btn-sm btn-secondary">Edit</a></td>`;
                 document.getElementById('entry-body').appendChild(tr);
                 form.reset();
                 if (storedName) nameField.value = storedName;

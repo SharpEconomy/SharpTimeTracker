@@ -25,6 +25,10 @@ body {
     background-color: #fff;
 }
 
+td {
+    white-space: pre-wrap;
+}
+
 .modal-header,
 .modal-footer {
     border: none;
