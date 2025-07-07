@@ -22,6 +22,7 @@ app.secret_key = 'secret123'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 if not os.path.exists(CSV_FILE):
