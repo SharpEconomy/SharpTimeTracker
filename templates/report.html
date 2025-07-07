@@ -22,10 +22,22 @@
 <div class="container mt-4">
     <h2>Weekly Time Report</h2>
     <canvas id="weekly-chart" width="400" height="200"></canvas>
+    <div class="row mt-3">
+        <div class="col-md-3">
+            <label class="form-label">Person</label>
+            <select id="person-filter" class="form-select"><option value="">-- Select --</option></select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label">Day</label>
+            <select id="day-filter" class="form-select"><option value="">-- Select --</option></select>
+        </div>
+    </div>
+    <div id="summary" class="mt-3"></div>
     <a href="/weekly-download" class="btn btn-success mt-3">Download Weekly CSV</a>
     <a href="/" class="btn btn-secondary mt-3">Back to Log</a>
 </div>
 <script>
+let weeklyData, dailyData;
 fetch('/weekly-data').then(res => res.json()).then(data => {
     const ctx = document.getElementById('weekly-chart').getContext('2d');
     const labels = data.weeks;
@@ -43,6 +55,50 @@ fetch('/weekly-data').then(res => res.json()).then(data => {
             scales: { x: { stacked: true }, y: { stacked: true } }
         }
     });
+    weeklyData = data;
+    const personSelect = document.getElementById('person-filter');
+    data.names.forEach(n => {
+        const opt = document.createElement('option');
+        opt.value = n; opt.textContent = n; personSelect.appendChild(opt);
+    });
+});
+
+fetch('/daily-data').then(r=>r.json()).then(d => {
+    dailyData = d;
+    const daySel = document.getElementById('day-filter');
+    d.dates.forEach(date => {
+        const opt = document.createElement('option');
+        opt.value = date; opt.textContent = date; daySel.appendChild(opt);
+    });
+});
+
+const summary = document.getElementById('summary');
+document.getElementById('person-filter').addEventListener('change', e => {
+    if(!weeklyData) return;
+    const name = e.target.value;
+    if(!name) { summary.textContent=''; return; }
+    const idx = weeklyData.names.indexOf(name);
+    let html = '<h5>Weekly Hours for '+name+'</h5><ul>';
+    weeklyData.weeks.forEach((week,i)=>{
+        const h = weeklyData.hours[name][i] || 0;
+        html += `<li>${week}: ${h.toFixed(2)}h ${h>=40?'✓':'✗'}</li>`;
+    });
+    html += '</ul>';
+    summary.innerHTML = html;
+});
+
+document.getElementById('day-filter').addEventListener('change', e => {
+    if(!dailyData) return;
+    const day = e.target.value;
+    if(!day) { summary.textContent=''; return; }
+    const idx = dailyData.dates.indexOf(day);
+    let html = '<h5>Hours on '+day+'</h5><ul>';
+    dailyData.names.forEach(n => {
+        const h = dailyData.hours[n][idx] || 0;
+        html += `<li>${n}: ${h.toFixed(2)}h ${h>=8?'✓':'✗'}</li>`;
+    });
+    html += '</ul>';
+    summary.innerHTML = html;
 });
 </script>
 </body>
