@@ -64,27 +64,48 @@ def weekly_download():
 
 def create_dash_app(flask_app):
     dash_app = Dash(__name__, server=flask_app, url_base_pathname='/dash/')
-    df = pd.read_csv(CSV_FILE)
-    df['Hours'] = [
-        (datetime.strptime(row['To Time'], '%H:%M') - datetime.strptime(row['From Time'], '%H:%M')).seconds / 3600
-        for _, row in df.iterrows()
-    ]
-    df['Date'] = pd.to_datetime(df['Date'])
-    df['Week'] = df['Date'].dt.to_period('W').astype(str)
-    weekly = df.groupby(['Week', 'Name'])['Hours'].sum().unstack(fill_value=0).reset_index()
 
-    traces = [go.Bar(name=col, x=weekly['Week'], y=weekly[col]) for col in weekly.columns if col != 'Week']
-
-    dash_app.layout = html.Div(children=[
-        html.H2('Weekly Report'),
-        dcc.Graph(
-            id='weekly-chart',
-            figure={
-                'data': traces,
-                'layout': go.Layout(barmode='stack', title='Weekly Time Tracked')
-            }
+    def serve_layout():
+        df = pd.read_csv(CSV_FILE)
+        df['Hours'] = [
+            (
+                datetime.strptime(row['To Time'], '%H:%M')
+                - datetime.strptime(row['From Time'], '%H:%M')
+            ).seconds
+            / 3600
+            for _, row in df.iterrows()
+        ]
+        df['Date'] = pd.to_datetime(df['Date'])
+        df['Week'] = df['Date'].dt.to_period('W').astype(str)
+        weekly = (
+            df.groupby(['Week', 'Name'])['Hours']
+            .sum()
+            .unstack(fill_value=0)
+            .reset_index()
         )
-    ])
+
+        traces = [
+            go.Bar(name=col, x=weekly['Week'], y=weekly[col])
+            for col in weekly.columns
+            if col != 'Week'
+        ]
+
+        return html.Div(
+            children=[
+                html.H2('Weekly Report'),
+                dcc.Graph(
+                    id='weekly-chart',
+                    figure={
+                        'data': traces,
+                        'layout': go.Layout(
+                            barmode='stack', title='Weekly Time Tracked'
+                        ),
+                    },
+                ),
+            ]
+        )
+
+    dash_app.layout = serve_layout
     return dash_app
 
 create_dash_app(app)
