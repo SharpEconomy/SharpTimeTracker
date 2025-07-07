@@ -11,7 +11,7 @@ CSV_FILE = 'time_log.csv'
 if not os.path.exists(CSV_FILE):
     with open(CSV_FILE, 'w', newline='') as file:
         writer = csv.writer(file)
-        writer.writerow(['Name', 'Email', 'Date', 'From Time', 'To Time', 'Task', 'Description'])
+        writer.writerow(['Name', 'Date', 'From Time', 'To Time', 'Task', 'Description'])
 
 def _read_entries():
     entries = []
@@ -48,10 +48,9 @@ def index():
 
 @app.route('/add', methods=['POST'])
 def add():
-    today = datetime.now().strftime('%Y-%m-%d')
+    today = request.form.get('date') or datetime.now().strftime('%Y-%m-%d')
     row = [
         request.form['name'],
-        request.form['email'],
         today,
         request.form['from_time'],
         request.form['to_time'],
