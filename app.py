@@ -48,10 +48,15 @@ def index():
 
 @app.route('/add', methods=['POST'])
 def add():
+    today = datetime.now().strftime('%Y-%m-%d')
     row = [
-        request.form['name'], request.form['email'], request.form['date'],
-        request.form['from_time'], request.form['to_time'],
-        request.form['task'], request.form['description']
+        request.form['name'],
+        request.form['email'],
+        today,
+        request.form['from_time'],
+        request.form['to_time'],
+        request.form['task'],
+        request.form['description']
     ]
     with open(CSV_FILE, 'a', newline='') as file:
         writer = csv.writer(file)
