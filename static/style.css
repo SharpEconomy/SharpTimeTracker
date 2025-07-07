@@ -1,0 +1,27 @@
+body {
+    background-color: #f5f7fa;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+.navbar-brand img {
+    height: 40px;
+    margin-right: 10px;
+}
+
+h2 {
+    color: #1a1a1a;
+}
+
+.btn-primary {
+    background-color: #0c59cf;
+    border-color: #0c59cf;
+}
+
+.btn-primary:hover {
+    background-color: #003cb3;
+    border-color: #003cb3;
+}
+
+.table {
+    background-color: white;
+}
