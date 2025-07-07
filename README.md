@@ -2,7 +2,8 @@
 
 This is a lightweight Flask time tracking app using a CSV file as the backend.
 Dash and pandas have been removed so installs on Render are much faster. Charts
-are now rendered client-side with Chart.js.
+are now rendered client-side with Chart.js. All entries are written to and read
+from `time_log.csv`, so your data persists across restarts.
 
 ## Features
 - User signup (name & email)

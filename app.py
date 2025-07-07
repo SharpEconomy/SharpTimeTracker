@@ -19,8 +19,10 @@ from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 app.secret_key = 'secret123'
-CSV_FILE = 'time_log.csv'
-UPLOAD_FOLDER = 'uploads'
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
+UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 if not os.path.exists(CSV_FILE):
@@ -42,6 +44,11 @@ def _read_entries():
         with open(CSV_FILE, newline='') as file:
             reader = csv.DictReader(file)
             for row in reader:
+                # handle files created with older headers
+                if 'File' not in row:
+                    row['File'] = ''
+                if 'Description' not in row:
+                    row['Description'] = ''
                 entries.append(row)
     return entries
 
