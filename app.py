@@ -17,12 +17,18 @@ from flask import (
     abort,
 )
 from werkzeug.utils import secure_filename
+from supabase import create_client
 
 app = Flask(__name__)
 app.secret_key = 'secret123'
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
+# use 'TimeTracker' table by default
+SUPABASE_TABLE = os.environ.get('SUPABASE_TABLE', 'TimeTracker')
+supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 FIELDNAMES = [
     'Name',
     'Date',
@@ -78,14 +84,48 @@ def _ensure_csv():
         writer.writeheader()
         writer.writerows(converted)
 
+def _map_row(row: dict) -> dict:
+    key_map = {
+        'name': 'Name',
+        'date': 'Date',
+        'from_time': 'From Time',
+        'to_time': 'To Time',
+        'task': 'Task',
+        'description': 'Description',
+        'file': 'File',
+        'completed': 'Completed',
+        'created_at': 'Created At',
+        'created at': 'Created At',
+    }
+    out = {}
+    for k, v in row.items():
+        kk = k.lower().replace(' ', '_')
+        if kk in key_map:
+            out[key_map[kk]] = v
+        else:
+            out[k] = v
+    for f in FIELDNAMES:
+        out.setdefault(f, '')
+    return out
+
+def _to_db_row(row: dict) -> dict:
+    return {k.lower().replace(' ', '_'): v for k, v in row.items()}
+
 def _read_entries():
+    if supabase:
+        try:
+            resp = supabase.table(SUPABASE_TABLE).select('*').execute()
+            data = resp.data or []
+            return [_map_row(row) for row in data]
+        except Exception as e:
+            print('Supabase read error:', e)
+
     _ensure_csv()
     entries = []
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE, newline='') as file:
             reader = csv.DictReader(file)
             for row in reader:
-                # handle files created with older headers
                 if 'File' not in row:
                     row['File'] = ''
                 if 'Description' not in row:
@@ -191,9 +231,15 @@ def add():
         'Completed': request.form.get('completed', '1'),
         'Created At': datetime.now().isoformat(),
     }
-    with open(CSV_FILE, 'a', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
-        writer.writerow(row)
+    if supabase:
+        try:
+            supabase.table(SUPABASE_TABLE).insert(_to_db_row(row)).execute()
+        except Exception as e:
+            print('Supabase insert error:', e)
+    else:
+        with open(CSV_FILE, 'a', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+            writer.writerow(row)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         hours = _hours(row['From Time'], row['To Time'])
@@ -321,10 +367,16 @@ def edit(index):
         row['Description'] = request.form.get('description', '')
         row['Completed'] = request.form.get('completed', '1')
         entries[index] = row
-        with open(CSV_FILE, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            writer.writerows(entries)
+        if supabase and 'id' in row:
+            try:
+                supabase.table(SUPABASE_TABLE).update(_to_db_row(row)).eq('id', row['id']).execute()
+            except Exception as e:
+                print('Supabase update error:', e)
+        else:
+            with open(CSV_FILE, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+                writer.writeheader()
+                writer.writerows(entries)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': True})
         flash('Entry updated')
