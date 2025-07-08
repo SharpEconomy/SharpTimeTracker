@@ -31,7 +31,6 @@ FIELDNAMES = [
     'Task',
     'Description',
     'File',
-    'Completed',
     'Created At',
 ]
 
@@ -44,34 +43,27 @@ def _ensure_csv():
             writer.writeheader()
         return
     with open(CSV_FILE, newline='') as f:
-        rows = list(csv.reader(f))
+        reader = csv.DictReader(f)
+        rows = list(reader)
+        header = reader.fieldnames or []
     if not rows:
         with open(CSV_FILE, 'w', newline='') as f:
             csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
         return
-    header = [h.strip() for h in rows[0]]
     if header == FIELDNAMES:
         return
     converted = []
-    for row in rows[1:]:
-        if not row:
-            continue
-        if len(row) >= 6 and row[4].replace('.', '', 1).isdigit():
-            task = row[5] if len(row) > 5 else ''
-            desc = row[6] if len(row) > 6 else ''
-        else:
-            task = row[4] if len(row) > 4 else ''
-            desc = row[5] if len(row) > 5 else ''
+    for raw in rows:
+        row = _map_row(raw)
         converted.append({
-            'Name': row[0] if len(row) > 0 else '',
-            'Date': row[1] if len(row) > 1 else '',
-            'From Time': row[2] if len(row) > 2 else '',
-            'To Time': row[3] if len(row) > 3 else '',
-            'Task': task,
-            'Description': desc,
-            'File': '',
-            'Completed': '1',
-            'Created At': datetime.now().isoformat(),
+            'Name': row.get('Name', ''),
+            'Date': row.get('Date', ''),
+            'From Time': row.get('From Time', ''),
+            'To Time': row.get('To Time', ''),
+            'Task': row.get('Task', ''),
+            'Description': row.get('Description', ''),
+            'File': row.get('File', ''),
+            'Created At': row.get('Created At', datetime.now().isoformat()),
         })
     with open(CSV_FILE, 'w', newline='') as f:
         writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
@@ -87,7 +79,6 @@ def _map_row(row: dict) -> dict:
         'task': 'Task',
         'description': 'Description',
         'file': 'File',
-        'completed': 'Completed',
         'created_at': 'Created At',
         'created at': 'Created At',
     }
@@ -113,8 +104,6 @@ def _read_entries():
                     row['File'] = ''
                 if 'Description' not in row:
                     row['Description'] = ''
-                if 'Completed' not in row:
-                    row['Completed'] = '1'
                 if 'Created At' not in row:
                     row['Created At'] = datetime.now().isoformat()
                 entries.append(row)
@@ -124,8 +113,20 @@ def _hours(from_t, to_t):
     fmt = '%H:%M'
     return (datetime.strptime(to_t, fmt) - datetime.strptime(from_t, fmt)).seconds / 3600
 
+def _parse_date(date_str):
+    formats = ['%Y-%m-%d', '%m-%d-%Y', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y']
+    for fmt in formats:
+        try:
+            return datetime.strptime(date_str, fmt)
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(date_str)
+    except ValueError:
+        return datetime.now()
+
 def _format_date(date_str, show_year=False):
-    dt = datetime.strptime(date_str, '%Y-%m-%d')
+    dt = _parse_date(date_str)
     return dt.strftime('%m/%d/%Y' if show_year else '%m/%d')
 
 @app.template_filter('linkify')
@@ -136,7 +137,7 @@ def _linkify(text):
 def _weekly_summary(entries):
     weekly = defaultdict(lambda: defaultdict(float))
     for row in entries:
-        dt = datetime.strptime(row['Date'], '%Y-%m-%d')
+        dt = _parse_date(row['Date'])
         week_start = dt - timedelta(days=dt.weekday())
         key = week_start.strftime('%Y-%m-%d')
         weekly[key][row['Name']] += _hours(row['From Time'], row['To Time'])
@@ -152,7 +153,7 @@ def _weekday_summary(entries):
     days = defaultdict(lambda: defaultdict(float))
     labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     for row in entries:
-        dt = datetime.strptime(row['Date'], '%Y-%m-%d')
+        dt = _parse_date(row['Date'])
         key = labels[dt.weekday()]
         days[key][row['Name']] += _hours(row['From Time'], row['To Time'])
     return days
@@ -161,7 +162,7 @@ def _weekday_summary(entries):
 @app.route('/')
 def index():
     entries = _read_entries()
-    years = {datetime.strptime(e['Date'], '%Y-%m-%d').year for e in entries}
+    years = {_parse_date(e['Date']).year for e in entries}
     show_year = any(year != 2025 for year in years)
     for i, e in enumerate(entries):
         e['index'] = i
@@ -211,7 +212,6 @@ def add():
         'Task': request.form['task'],
         'Description': request.form.get('description', ''),
         'File': filename,
-        'Completed': request.form.get('completed', '1'),
         'Created At': datetime.now().isoformat(),
     }
     with open(CSV_FILE, 'a', newline='') as file:
@@ -220,7 +220,7 @@ def add():
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         hours = _hours(row['From Time'], row['To Time'])
-        years = {datetime.strptime(r['Date'], '%Y-%m-%d').year for r in _read_entries()}
+        years = {_parse_date(r['Date']).year for r in _read_entries()}
         show_year = any(y != 2025 for y in years)
         return jsonify(
             {
@@ -231,7 +231,6 @@ def add():
                 'task': row['Task'],
                 'description_html': _linkify(row['Description']),
                 'file_link': f'<a href="/uploads/{filename}" download target="_blank">{filename}</a>' if filename else '',
-                'completed': row['Completed'],
                 'index': index,
             }
         )
@@ -247,7 +246,7 @@ def report():
 def weekly_data():
     weekly = _weekly_summary(_read_entries())
     weeks = sorted(weekly.keys())
-    years = {datetime.strptime(w, '%Y-%m-%d').year for w in weeks}
+    years = {_parse_date(w).year for w in weeks}
     show_year = any(y != 2025 for y in years)
     labels = [_format_date(w, show_year) for w in weeks]
     names = sorted({name for w in weekly.values() for name in w.keys()})
@@ -301,7 +300,7 @@ def download():
 def weekly_download():
     weekly = _weekly_summary(_read_entries())
     weeks = sorted(weekly.keys())
-    years = {datetime.strptime(w, '%Y-%m-%d').year for w in weeks}
+    years = {_parse_date(w).year for w in weeks}
     show_year = any(y != 2025 for y in years)
     labels = [_format_date(w, show_year) for w in weeks]
     names = sorted({name for w in weekly.values() for name in w.keys()})
@@ -342,7 +341,6 @@ def edit(index):
         row['To Time'] = request.form['to_time']
         row['Task'] = request.form['task']
         row['Description'] = request.form.get('description', '')
-        row['Completed'] = request.form.get('completed', '1')
         entries[index] = row
         with open(CSV_FILE, 'w', newline='') as f:
             writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
