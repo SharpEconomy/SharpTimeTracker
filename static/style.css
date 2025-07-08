@@ -33,6 +33,10 @@ td {
     max-height: 200px;
 }
 
+.chart-container {
+    overflow-x: auto;
+}
+
 .attach-btn {
     border-color: #ced4da;
 }

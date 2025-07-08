@@ -21,7 +21,9 @@
 
 <div class="container mt-4">
     <h2>Weekly Time Report</h2>
-    <canvas id="weekly-chart" width="400" height="200"></canvas>
+    <div class="chart-container">
+        <canvas id="weekly-chart" height="200"></canvas>
+    </div>
     <div class="row mt-3">
         <div class="col-md-3">
             <label class="form-label">Person</label>
@@ -37,29 +39,47 @@
     <a href="/" class="btn btn-secondary mt-3">Back to Log</a>
 </div>
 <script>
-let weekdaysData, dailyData;
+let weekdaysData, dailyData, chart;
 fetch('/weekdays-data').then(res => res.json()).then(data => {
-    const ctx = document.getElementById('weekly-chart').getContext('2d');
+    const canvas = document.getElementById('weekly-chart');
+    const ctx = canvas.getContext('2d');
     const labels = data.days;
-    const datasets = data.names.map((n, i) => ({
+
+    const makeDatasets = names => names.map((n, i) => ({
         label: n,
         data: data.hours[n],
-        backgroundColor: `hsl(${i * 60},70%,60%)`
+        backgroundColor: `hsl(${(i * 40) % 360},70%,60%)`
     }));
-    new Chart(ctx, {
+
+    const updateWidth = count => {
+        canvas.width = labels.length * count * 40;
+    };
+
+    chart = new Chart(ctx, {
         type: 'bar',
-        data: { labels: labels, datasets: datasets },
+        data: { labels: labels, datasets: makeDatasets(data.names) },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: { title: { display: true, text: 'Hours Per Day' } },
-            scales: { x: { stacked: true }, y: { stacked: true } }
+            scales: { x: { stacked: false }, y: { stacked: false, beginAtZero: true } }
         }
     });
+    updateWidth(data.names.length);
+
     weekdaysData = data;
     const personSelect = document.getElementById('person-filter');
     data.names.forEach(n => {
         const opt = document.createElement('option');
         opt.value = n; opt.textContent = n; personSelect.appendChild(opt);
+    });
+
+    personSelect.addEventListener('change', () => {
+        const name = personSelect.value;
+        const names = name ? [name] : data.names;
+        chart.data.datasets = makeDatasets(names);
+        updateWidth(names.length);
+        chart.update();
     });
 });
 
@@ -73,19 +93,6 @@ fetch('/daily-data').then(r=>r.json()).then(d => {
 });
 
 const summary = document.getElementById('summary');
-document.getElementById('person-filter').addEventListener('change', e => {
-    if(!weekdaysData) return;
-    const name = e.target.value;
-    if(!name) { summary.textContent=''; return; }
-    const idx = weekdaysData.names.indexOf(name);
-    let html = '<h5>Hours for '+name+'</h5><ul>';
-    weekdaysData.days.forEach((day,i)=>{
-        const h = weekdaysData.hours[name][i] || 0;
-        html += `<li>${day}: ${h.toFixed(2)}h ${h>=8?'✓':'✗'}</li>`;
-    });
-    html += '</ul>';
-    summary.innerHTML = html;
-});
 
 document.getElementById('day-filter').addEventListener('change', e => {
     if(!dailyData) return;
