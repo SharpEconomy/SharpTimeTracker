@@ -29,6 +29,14 @@ td {
     white-space: pre-wrap;
 }
 
+.day-chart {
+    max-height: 200px;
+}
+
+.attach-btn {
+    border-color: #ced4da;
+}
+
 .modal-header,
 .modal-footer {
     border: none;

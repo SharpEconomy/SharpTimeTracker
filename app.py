@@ -125,6 +125,15 @@ def _daily_summary(entries):
         daily[row['Date']][row['Name']] += _hours(row['From Time'], row['To Time'])
     return daily
 
+def _weekday_summary(entries):
+    days = defaultdict(lambda: defaultdict(float))
+    labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    for row in entries:
+        dt = datetime.strptime(row['Date'], '%Y-%m-%d')
+        key = labels[dt.weekday()]
+        days[key][row['Name']] += _hours(row['From Time'], row['To Time'])
+    return days
+
 
 @app.route('/')
 def index():
@@ -138,7 +147,25 @@ def index():
         mins = int(round((e['hours'] - hrs) * 60))
         e['duration_str'] = f"{hrs}h {mins}m"
         e['date_display'] = _format_date(e['Date'], show_year)
-    return render_template('index.html', data=entries, show_year=show_year)
+
+    grouped = defaultdict(list)
+    totals = {}
+    for e in entries:
+        grouped[e['Date']].append(e)
+    for date, rows in grouped.items():
+        per = defaultdict(float)
+        for r in rows:
+            per[r['Name']] += r['hours']
+        totals[date] = per
+
+    ordered = dict(sorted(grouped.items()))
+    return render_template(
+        'index.html',
+        grouped=ordered,
+        totals=totals,
+        show_year=show_year,
+        format_date=_format_date,
+    )
 
 @app.route('/add', methods=['POST'])
 def add():
@@ -212,6 +239,14 @@ def daily_data():
     hours = {name: [daily[date].get(name, 0) for date in dates] for name in names}
     return jsonify({'dates': dates, 'names': names, 'hours': hours})
 
+@app.route('/weekdays-data')
+def weekdays_data():
+    days = _weekday_summary(_read_entries())
+    labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    names = sorted({n for d in days.values() for n in d.keys()})
+    hours = {name: [days[lab].get(name, 0) for lab in labels] for name in names}
+    return jsonify({'days': labels, 'names': names, 'hours': hours})
+
 @app.route('/download')
 def download():
     entries = _read_entries()
@@ -274,6 +309,8 @@ def edit(index):
         created = datetime.now()
 
     if datetime.now() - created > timedelta(hours=24):
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'error': 'expired'}), 400
         flash('Editing period expired')
         return redirect(url_for('index'))
     if request.method == 'POST':
@@ -288,8 +325,14 @@ def edit(index):
             writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
             writer.writeheader()
             writer.writerows(entries)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return jsonify({'success': True})
         flash('Entry updated')
         return redirect(url_for('index'))
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        data = dict(row)
+        data['index'] = index
+        return jsonify(data)
     return render_template('edit.html', row=row, index=index)
 
 if __name__ == '__main__':

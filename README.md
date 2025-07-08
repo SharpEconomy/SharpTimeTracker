@@ -9,7 +9,9 @@ from `time_log.csv`, so your data persists across restarts.
 - User signup (name & email)
 - Time tracking (with from–to time, task, and description)
 - Daily log viewer
-- Weekly report using Chart.js
+- Weekly report using Chart.js with day-by-day bars
+- Accordion daily log view with inline charts
+- Inline editing popup
 - CSV download (raw + weekly)
 - Sharp Economy branding
 
