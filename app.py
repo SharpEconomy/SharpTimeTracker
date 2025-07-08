@@ -55,12 +55,15 @@ def _ensure_csv():
     for row in rows[1:]:
         if not row:
             continue
-        if len(row) >= 6 and row[4].replace('.', '', 1).isdigit():
+        has_hours = len(row) >= 6 and row[4].replace('.', '', 1).isdigit()
+        if has_hours:
             task = row[5] if len(row) > 5 else ''
             desc = row[6] if len(row) > 6 else ''
+            file_val = row[7] if len(row) > 7 else ''
         else:
             task = row[4] if len(row) > 4 else ''
             desc = row[5] if len(row) > 5 else ''
+            file_val = row[6] if len(row) > 6 else ''
         converted.append({
             'Name': row[0] if len(row) > 0 else '',
             'Date': row[1] if len(row) > 1 else '',
@@ -68,7 +71,7 @@ def _ensure_csv():
             'To Time': row[3] if len(row) > 3 else '',
             'Task': task,
             'Description': desc,
-            'File': row[6] if len(row) > 6 else '',
+            'File': file_val,
             'Created At': datetime.now().isoformat(),
         })
     with open(CSV_FILE, 'w', newline='') as f:
@@ -120,13 +123,16 @@ def _hours(from_t, to_t):
     return (datetime.strptime(to_t, fmt) - datetime.strptime(from_t, fmt)).seconds / 3600
 
 def _parse_date(date_str):
-    try:
-        return datetime.strptime(date_str, '%Y-%m-%d')
-    except ValueError:
+    formats = ['%Y-%m-%d', '%m-%d-%Y', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y']
+    for fmt in formats:
         try:
-            return datetime.fromisoformat(date_str)
+            return datetime.strptime(date_str, fmt)
         except ValueError:
-            return datetime.now()
+            pass
+    try:
+        return datetime.fromisoformat(date_str)
+    except ValueError:
+        return datetime.now()
 
 def _format_date(date_str, show_year=False):
     dt = _parse_date(date_str)
