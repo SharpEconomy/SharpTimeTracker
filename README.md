@@ -3,9 +3,11 @@
 This is a lightweight Flask time tracking app using a CSV file as the default
 backend. You can optionally set `SUPABASE_URL` and `SUPABASE_KEY` environment
 variables to store time entries in a Supabase Postgres table (defaults to
-`TimeTracker`). Charts are rendered client-side with Chart.js. All entries are
-written to and read from `time_log.csv` when no database credentials are
-provided, so your data persists across restarts.
+`TimeTracker`). Column names may use spaces (e.g. `"From Time"`) or snake case
+(e.g. `from_time`)—the app will convert automatically. Charts are rendered
+client-side with Chart.js. All entries are written to and read from
+`time_log.csv` when no database credentials are provided, so your data persists
+across restarts.
 
 ## Features
 - User signup (name & email)

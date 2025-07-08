@@ -84,21 +84,39 @@ def _ensure_csv():
         writer.writeheader()
         writer.writerows(converted)
 
+def _map_row(row: dict) -> dict:
+    key_map = {
+        'name': 'Name',
+        'date': 'Date',
+        'from_time': 'From Time',
+        'to_time': 'To Time',
+        'task': 'Task',
+        'description': 'Description',
+        'file': 'File',
+        'completed': 'Completed',
+        'created_at': 'Created At',
+        'created at': 'Created At',
+    }
+    out = {}
+    for k, v in row.items():
+        kk = k.lower().replace(' ', '_')
+        if kk in key_map:
+            out[key_map[kk]] = v
+        else:
+            out[k] = v
+    for f in FIELDNAMES:
+        out.setdefault(f, '')
+    return out
+
+def _to_db_row(row: dict) -> dict:
+    return {k.lower().replace(' ', '_'): v for k, v in row.items()}
+
 def _read_entries():
     if supabase:
         try:
             resp = supabase.table(SUPABASE_TABLE).select('*').execute()
             data = resp.data or []
-            for row in data:
-                if 'File' not in row:
-                    row['File'] = ''
-                if 'Description' not in row:
-                    row['Description'] = ''
-                if 'Completed' not in row:
-                    row['Completed'] = '1'
-                if 'Created At' not in row:
-                    row['Created At'] = datetime.now().isoformat()
-            return data
+            return [_map_row(row) for row in data]
         except Exception as e:
             print('Supabase read error:', e)
 
@@ -215,7 +233,7 @@ def add():
     }
     if supabase:
         try:
-            supabase.table(SUPABASE_TABLE).insert(row).execute()
+            supabase.table(SUPABASE_TABLE).insert(_to_db_row(row)).execute()
         except Exception as e:
             print('Supabase insert error:', e)
     else:
@@ -351,7 +369,7 @@ def edit(index):
         entries[index] = row
         if supabase and 'id' in row:
             try:
-                supabase.table(SUPABASE_TABLE).update(row).eq('id', row['id']).execute()
+                supabase.table(SUPABASE_TABLE).update(_to_db_row(row)).eq('id', row['id']).execute()
             except Exception as e:
                 print('Supabase update error:', e)
         else:
