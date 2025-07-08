@@ -1,10 +1,16 @@
-Name,Date,From Time,To Time,Task,Description,File,Completed,Created At
-Rohit Gupta,2025-07-07,09:00,09:30,Sharp Rewards Standup Call,,,1,2025-07-07T14:38:49.163269
-Rohit Gupta,2025-07-07,09:30,10:00,SIF Internal Planning,Scheduled call for daily standup,,1,2025-07-07T14:38:49.163296
-Rohit Gupta,2025-07-07,10:30,11:15,Sharp Rewards Health feature,Worked with pravesh and gaurav to finalize the health feature requrinments,,1,2025-07-07T14:38:49.163300
-Rohit Gupta,2025-07-07,10:00,10:30,Sharp Rewards Health Feature brainstorming,,,1,2025-07-07T14:38:49.163303
-Rohit Tomar,2025-07-07,09:30,10:00,Stand Up With Interns,Call with all the interns to check the weekly calendar for social Media,,1,2025-07-07T14:38:49.163307
-Rohit Tomar,2025-07-07,10:21,10:45,Csharp TV,Call with simon for this week csharptv live show and conference discussion ,,1,2025-07-07T14:38:49.163310
-Rohit Gupta,2025-07-07,16:00,17:00,AI/ML Training,,,1,2025-07-07T14:38:49.163313
-Rohit Gupta,2025-07-07,13:30,16:00,Leads call reporting,"Format data, and hosted on corresponding URLS",,1,2025-07-07T14:38:49.163320
-Rohit Gupta,2025-07-07,11:15,13:00,Sharp Time Tracker development,,,1,2025-07-07T14:38:49.163323
+Date,From Time,To Time,Hours,Task,Description,File
+07-07-2025,09:00,09:30,0.5,Sharp Rewards Standup Call,,
+07-07-2025,09:30,10:00,0.5,SIF Internal Planning,Scheduled call for daily standup,
+07-07-2025,10:30,11:15,0.75,Sharp Rewards Health feature,Worked with pravesh and gaurav to finalize the health feature requrinments,
+07-07-2025,10:00,10:30,0.5,Sharp Rewards Health Feature brainstorming,,
+07-07-2025,09:30,10:00,0.5,Stand Up With Interns,Call with all the interns to check the weekly calendar for social Media,
+07-07-2025,10:21,10:45,0.4,Csharp TV,Call with simon for this week csharptv live show and conference discussion ,
+07-07-2025,16:00,17:00,1,AI/ML Training,,
+07-07-2025,13:30,16:00,2.5,Leads call reporting,"Format data, and hosted on corresponding URLS",
+07-07-2025,11:15,13:00,1.75,Sharp Time Tracker development,,
+08-07-2025,09:00,09:30,0.5,Sharp Rewards Standup Call,,
+08-07-2025,09:30,10:20,0.83,Leads call reporting,,
+08-07-2025,19:00,19:15,0.25,Market Making weekly,,
+08-07-2025,19:30,20:30,1,SIF Weekly,,
+08-07-2025,20:30,21:00,0.5,UCB planning call,,
+08-07-2025,21:30,22:30,1,UCB Session 1,,
