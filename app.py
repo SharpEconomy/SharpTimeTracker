@@ -26,7 +26,8 @@ CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 SUPABASE_URL = os.environ.get('SUPABASE_URL')
 SUPABASE_KEY = os.environ.get('SUPABASE_KEY')
-SUPABASE_TABLE = os.environ.get('SUPABASE_TABLE', 'time_logs')
+# use 'TimeTracker' table by default
+SUPABASE_TABLE = os.environ.get('SUPABASE_TABLE', 'TimeTracker')
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 FIELDNAMES = [
     'Name',
