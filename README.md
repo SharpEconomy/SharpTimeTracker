@@ -15,6 +15,7 @@ client-side with Chart.js. All entries are written to and read from
 - Inline editing popup
 - CSV download (raw + weekly)
 - Sharp Economy branding
+- Simple, CSV-only storage without a "Completed" column
 
 ## File Structure
 ```
