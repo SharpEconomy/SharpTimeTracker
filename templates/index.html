@@ -60,16 +60,6 @@
         </div>
     </form>
     </div>
-    <div class="card p-4 mb-4">
-    <form id="csv-form" class="row g-3" enctype="multipart/form-data">
-        <div class="col-md-6">
-            <input type="file" name="csv" accept=".csv" class="form-control" required>
-        </div>
-        <div class="col-md-2 d-grid">
-            <button type="submit" class="btn btn-secondary">Upload CSV</button>
-        </div>
-    </form>
-    </div>
     {% if grouped %}
     <div class="accordion" id="day-accordion">
     {% for date, rows in grouped.items() %}
@@ -90,7 +80,7 @@
                                 <th>Task</th>
                                 <th>Description</th>
                                 <th>File</th>
-                                <th></th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -101,7 +91,10 @@
                                 <td>{{ row['Task'] }}</td>
                                 <td>{{ row['Description']|linkify|safe }}</td>
                                 <td>{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
-                                <td><button class="btn btn-sm btn-secondary edit-btn" data-id="{{ row['id'] }}">Edit</button></td>
+                                <td>
+                                    <button class="btn btn-sm btn-secondary edit-btn" data-id="{{ row['id'] }}">Edit</button>
+                                    <button class="btn btn-sm btn-danger delete-btn" data-id="{{ row['id'] }}">Delete</button>
+                                </td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -192,6 +185,14 @@ document.addEventListener('DOMContentLoaded', function(){
                     editForm.description.value = row.Description;
                     editModal.show();
                 });
+        });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach(btn=>{
+        btn.addEventListener('click', ()=>{
+            const id = btn.dataset.id;
+            fetch(`/delete/${id}`, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}})
+                .then(()=>location.reload());
         });
     });
 
