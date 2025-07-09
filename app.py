@@ -94,7 +94,7 @@ def _read_entries():
         firestore.client()
         .collection('time_entries')
         .order_by('Date')
-        .order_by(field_path.FieldPath('From Time'))
+        .order_by(field_path.FieldPath('From Time').to_api_repr())
         .stream()
     )
     entries = []
