@@ -106,6 +106,7 @@ def _read_entries():
                     row['Description'] = ''
                 if 'Created At' not in row:
                     row['Created At'] = datetime.now().isoformat()
+                row['Date'] = _canonical_date(row['Date'])
                 entries.append(row)
     return entries
 
@@ -124,6 +125,9 @@ def _parse_date(date_str):
         return datetime.fromisoformat(date_str)
     except ValueError:
         return datetime.now()
+
+def _canonical_date(date_str):
+    return _parse_date(date_str).strftime('%Y-%m-%d')
 
 def _format_date(date_str, show_year=False):
     dt = _parse_date(date_str)
@@ -146,7 +150,8 @@ def _weekly_summary(entries):
 def _daily_summary(entries):
     daily = defaultdict(lambda: defaultdict(float))
     for row in entries:
-        daily[row['Date']][row['Name']] += _hours(row['From Time'], row['To Time'])
+        key = _canonical_date(row['Date'])
+        daily[key][row['Name']] += _hours(row['From Time'], row['To Time'])
     return daily
 
 def _weekday_summary(entries):
@@ -176,7 +181,8 @@ def index():
     grouped = defaultdict(list)
     totals = {}
     for e in entries:
-        grouped[e['Date']].append(e)
+        key = _canonical_date(e['Date'])
+        grouped[key].append(e)
     for date, rows in grouped.items():
         per = defaultdict(float)
         for r in rows:
@@ -195,6 +201,7 @@ def index():
 @app.route('/add', methods=['POST'])
 def add():
     today = request.form.get('date', datetime.now().strftime('%Y-%m-%d'))
+    today = _canonical_date(today)
     uploaded = request.files.get('file')
     filename = ''
     if uploaded and uploaded.filename:
@@ -338,7 +345,7 @@ def edit(index):
         flash('Editing period expired')
         return redirect(url_for('index'))
     if request.method == 'POST':
-        row['Date'] = request.form['date']
+        row['Date'] = _canonical_date(request.form['date'])
         row['From Time'] = request.form['from_time']
         row['To Time'] = request.form['to_time']
         row['Task'] = request.form['task']
