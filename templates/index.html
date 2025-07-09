@@ -87,7 +87,7 @@
                             <tr>
                                 <td>{{ row['Name'] }}</td>
                                 <td>{{ row['From Time'] }}-{{ row['To Time'] }}</td>
-                                <td>{{ '%.2f'|format(row.hours) }}</td>
+                                <td>{{ row.duration_hm }}</td>
                                 <td>{{ row['Task'] }}</td>
                                 <td>{{ row['Description']|linkify|safe }}</td>
                                 <td>{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
