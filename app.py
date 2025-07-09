@@ -271,19 +271,39 @@ def import_csv():
     uploaded = request.files.get('csv')
     if not uploaded or not uploaded.filename:
         return jsonify({'error': 'no file'}), 400
+    col = firestore.client().collection('time_entries')
+
+    # build set of existing entries to avoid duplicates (date+duration+task)
+    existing = set()
+    for doc in col.stream():
+        d = doc.to_dict()
+        key = (
+            _canonical_date(d.get('Date', '')),
+            d.get('Duration', ''),
+            d.get('Task', ''),
+        )
+        existing.add(key)
+
+    seen = set()
     reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
     for row in reader:
-        duration = row.get('Duration') or ''
+        date = _canonical_date(row.get('Date', datetime.now().strftime('%Y-%m-%d')))
+        duration = row.get('Duration', '')
+        task = row.get('Task', '')
+        key = (date, duration, task)
+        if key in existing or key in seen:
+            continue
+        seen.add(key)
         data = {
             'Name': row.get('Name', ''),
-            'Date': _canonical_date(row.get('Date', '')),
+            'Date': date,
             'Duration': duration,
-            'Task': row.get('Task', ''),
+            'Task': task,
             'Description': row.get('Description', ''),
             'File': row.get('File', ''),
             'Created At': datetime.now().isoformat(),
         }
-        firestore.client().collection('time_entries').add(data)
+        col.add(data)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'success': True})
     flash('CSV imported')
@@ -427,6 +447,14 @@ def edit(entry_id):
         data['id'] = entry_id
         return jsonify(data)
     return render_template('edit.html', row=row, index=entry_id)
+
+@app.route('/delete/<entry_id>', methods=['POST'])
+def delete(entry_id):
+    firestore.client().collection('time_entries').document(entry_id).delete()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
+    flash('Entry deleted')
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
