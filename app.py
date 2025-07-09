@@ -38,7 +38,11 @@ FIELDNAMES = [
 
 DB_URL = os.environ.get('SUPABASE_DB_URL') or os.environ.get('DATABASE_URL')
 TABLE_NAME = 'time_entries'
-conn = psycopg2.connect(DB_URL) if DB_URL else None
+
+def get_conn():
+    if not DB_URL:
+        return None
+    return psycopg2.connect(DB_URL)
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -66,10 +70,12 @@ def _map_row(row: dict) -> dict:
     return out
 
 def _read_entries():
-    if conn:
-        with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY date, from_time")
-            rows = cur.fetchall()
+    if DB_URL:
+        with get_conn() as conn:
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                cur.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY date, from_time")
+                rows = cur.fetchall()
+
         entries = []
         for row in rows:
             mapped = _map_row(row)
@@ -89,6 +95,11 @@ def _read_entries():
 def _hours(from_t, to_t):
     fmt = '%H:%M'
     return (datetime.strptime(to_t, fmt) - datetime.strptime(from_t, fmt)).seconds / 3600
+
+def _hm(hours: float) -> str:
+    hrs = int(hours)
+    mins = int(round((hours - hrs) * 60))
+    return f"{hrs}:{mins:02d}"
 
 def _parse_date(date_str):
     formats = ['%Y-%m-%d', '%m-%d-%Y', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y']
@@ -206,23 +217,25 @@ def add():
         'File': filename,
         'Created At': datetime.now().isoformat(),
     }
-    if conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                f"INSERT INTO {TABLE_NAME} (name, date, from_time, to_time, task, description, file, created_at) "
-                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                (
-                    row['Name'],
-                    row['Date'],
-                    row['From Time'],
-                    row['To Time'],
-                    row['Task'],
-                    row['Description'],
-                    row['File'],
-                    row['Created At'],
-                ),
-            )
-            conn.commit()
+    if DB_URL:
+        with get_conn() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"INSERT INTO {TABLE_NAME} (name, date, from_time, to_time, task, description, file, created_at) "
+                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        row['Name'],
+                        row['Date'],
+                        row['From Time'],
+                        row['To Time'],
+                        row['Task'],
+                        row['Description'],
+                        row['File'],
+                        row['Created At'],
+                    ),
+                )
+                conn.commit()
+
     else:
         with open(CSV_FILE, 'a', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
@@ -327,7 +340,7 @@ def download():
                 e['Date'],
                 e['From Time'],
                 e['To Time'],
-                round(_hours(e['From Time'], e['To Time']), 2),
+                _hm(_hours(e['From Time'], e['To Time'])),
                 e['Task'],
                 e['Description'],
                 e['File'],
@@ -380,20 +393,22 @@ def edit(index):
         row['Task'] = request.form['task']
         row['Description'] = request.form.get('description', '')
         entries[index] = row
-        if conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"UPDATE {TABLE_NAME} SET date=%s, from_time=%s, to_time=%s, task=%s, description=%s WHERE id=%s",
-                    (
-                        row['Date'],
-                        row['From Time'],
-                        row['To Time'],
-                        row['Task'],
-                        row['Description'],
-                        row.get('id'),
-                    ),
-                )
-                conn.commit()
+        if DB_URL:
+            with get_conn() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        f"UPDATE {TABLE_NAME} SET date=%s, from_time=%s, to_time=%s, task=%s, description=%s WHERE id=%s",
+                        (
+                            row['Date'],
+                            row['From Time'],
+                            row['To Time'],
+                            row['Task'],
+                            row['Description'],
+                            row.get('id'),
+                        ),
+                    )
+                    conn.commit()
+
         else:
             with open(CSV_FILE, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
