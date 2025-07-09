@@ -1,7 +1,7 @@
 # Time Tracker App (Render-Ready)
 
 This is a lightweight Flask time tracking app that stores entries in a
-PostgreSQL table on Supabase using `psycopg2`. Column names may use spaces
+PostgreSQL table on Supabase using `psycopg`. Column names may use spaces
 (e.g. `"From Time"`) or snake case (e.g. `from_time`)—the app converts them
 automatically. Charts are rendered client-side with Chart.js.
 
@@ -14,7 +14,7 @@ automatically. Charts are rendered client-side with Chart.js.
 - Inline editing popup
 - CSV download (raw + weekly)
 - Sharp Economy branding
-- Stores data in a Supabase PostgreSQL table via `psycopg2`
+- Stores data in a Supabase PostgreSQL table via `psycopg`
 
 ## File Structure
 ```

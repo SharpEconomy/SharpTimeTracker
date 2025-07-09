@@ -17,8 +17,8 @@ from flask import (
     abort,
 )
 from werkzeug.utils import secure_filename
-import psycopg2
-from psycopg2.extras import RealDictCursor
+import psycopg
+from psycopg.rows import dict_row
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
@@ -42,7 +42,7 @@ TABLE_NAME = 'time_entries'
 def get_conn():
     if not DB_URL:
         return None
-    return psycopg2.connect(DB_URL)
+    return psycopg.connect(DB_URL)
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -72,7 +72,7 @@ def _map_row(row: dict) -> dict:
 def _read_entries():
     if DB_URL:
         with get_conn() as conn:
-            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            with conn.cursor(row_factory=dict_row) as cur:
                 cur.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY date, from_time")
                 rows = cur.fetchall()
 

@@ -1,7 +1,7 @@
 import os
 import csv
 from datetime import datetime
-import psycopg2
+import psycopg
 
 DB_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL")
 if not DB_URL:
@@ -9,7 +9,7 @@ if not DB_URL:
 
 TABLE = "time_entries"
 
-with psycopg2.connect(DB_URL) as conn:
+with psycopg.connect(DB_URL) as conn:
     with conn.cursor() as cur:
         cur.execute(
             f"""
@@ -42,7 +42,7 @@ def parse_date(s: str) -> str:
         return datetime.now().date().isoformat()
 
 
-with psycopg2.connect(DB_URL) as conn:
+with psycopg.connect(DB_URL) as conn:
     with conn.cursor() as cur:
         with open("time_log.csv", newline="") as f:
             reader = csv.DictReader(f)
