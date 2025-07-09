@@ -17,13 +17,25 @@ from flask import (
     abort,
 )
 from werkzeug.utils import secure_filename
-import psycopg
-from psycopg.rows import dict_row
+import json
+import firebase_admin
+from firebase_admin import credentials, firestore
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
+
+
+def _read_secret(name: str) -> str | None:
+    path = os.path.join('/etc/secrets', name)
+    if os.path.exists(path):
+        with open(path) as f:
+            return f.read().strip()
+    return None
+
+
+app.secret_key = _read_secret('flask_secret_key') or os.environ.get(
+    'FLASK_SECRET_KEY', 'replace-me'
+)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 FIELDNAMES = [
     'Name',
@@ -36,13 +48,20 @@ FIELDNAMES = [
     'Created At',
 ]
 
-DB_URL = os.environ.get('SUPABASE_DB_URL') or os.environ.get('DATABASE_URL')
-TABLE_NAME = 'time_entries'
-
-def get_conn():
-    if not DB_URL:
-        return None
-    return psycopg.connect(DB_URL)
+# Firebase initialization
+cert_path = os.path.join(
+    '/etc/secrets', 'sharptimetracker-firebase-adminsdk-fbsvc-973348138e.json'
+)
+if os.path.exists(cert_path):
+    cred = credentials.Certificate(cert_path)
+    firebase_admin.initialize_app(cred)
+else:
+    cred_json = os.environ.get('FIREBASE_CERT')
+    if cred_json:
+        cred = credentials.Certificate(json.loads(cred_json))
+        firebase_admin.initialize_app(cred)
+    else:
+        raise RuntimeError('Firebase credentials not found')
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -70,26 +89,14 @@ def _map_row(row: dict) -> dict:
     return out
 
 def _read_entries():
-    if DB_URL:
-        with get_conn() as conn:
-            with conn.cursor(row_factory=dict_row) as cur:
-                cur.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY date, from_time")
-                rows = cur.fetchall()
-
-        entries = []
-        for row in rows:
-            mapped = _map_row(row)
-            mapped['id'] = row.get('id')
-            mapped['Date'] = _canonical_date(mapped['Date'])
-            entries.append(mapped)
-        return entries
+    docs = firestore.client().collection('time_entries').order_by('Date').order_by('From Time').stream()
     entries = []
-    if os.path.exists(CSV_FILE):
-        with open(CSV_FILE, newline='') as file:
-            reader = csv.DictReader(file)
-            for row in reader:
-                row['Date'] = _canonical_date(row['Date'])
-                entries.append(row)
+    for doc in docs:
+        row = doc.to_dict()
+        mapped = _map_row(row)
+        mapped['id'] = doc.id
+        mapped['Date'] = _canonical_date(mapped['Date'])
+        entries.append(mapped)
     return entries
 
 def _hours(from_t, to_t):
@@ -164,8 +171,7 @@ def index():
     entries = _read_entries()
     years = {_parse_date(e['Date']).year for e in entries}
     show_year = any(year != 2025 for year in years)
-    for i, e in enumerate(entries):
-        e['index'] = i
+    for e in entries:
         e['hours'] = _hours(e['From Time'], e['To Time'])
         hrs = int(e['hours'])
         mins = int(round((e['hours'] - hrs) * 60))
@@ -205,8 +211,6 @@ def add():
         path = os.path.join(UPLOAD_FOLDER, fname)
         uploaded.save(path)
         filename = fname
-    entries = _read_entries()
-    index = len(entries)
     row = {
         'Name': request.form['name'],
         'Date': today,
@@ -217,29 +221,9 @@ def add():
         'File': filename,
         'Created At': datetime.now().isoformat(),
     }
-    if DB_URL:
-        with get_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute(
-                    f"INSERT INTO {TABLE_NAME} (name, date, from_time, to_time, task, description, file, created_at) "
-                    "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (
-                        row['Name'],
-                        row['Date'],
-                        row['From Time'],
-                        row['To Time'],
-                        row['Task'],
-                        row['Description'],
-                        row['File'],
-                        row['Created At'],
-                    ),
-                )
-                conn.commit()
-
-    else:
-        with open(CSV_FILE, 'a', newline='') as file:
-            writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
-            writer.writerow(row)
+    doc_ref = firestore.client().collection('time_entries').document()
+    doc_ref.set(row)
+    doc_id = doc_ref.id
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         hours = _hours(row['From Time'], row['To Time'])
@@ -255,11 +239,34 @@ def add():
                 'task': row['Task'],
                 'description_html': _linkify(row['Description']),
                 'file_link': f'<a href="/uploads/{filename}" download target="_blank">{filename}</a>' if filename else '',
-                'index': index,
+                'id': doc_id,
             }
         )
 
     flash('Time entry added successfully')
+    return redirect(url_for('index'))
+
+@app.route('/import', methods=['POST'])
+def import_csv():
+    uploaded = request.files.get('csv')
+    if not uploaded or not uploaded.filename:
+        return jsonify({'error': 'no file'}), 400
+    reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
+    for row in reader:
+        data = {
+            'Name': row.get('Name', ''),
+            'Date': _canonical_date(row.get('Date', '')),
+            'From Time': row.get('From Time', ''),
+            'To Time': row.get('To Time', ''),
+            'Task': row.get('Task', ''),
+            'Description': row.get('Description', ''),
+            'File': row.get('File', ''),
+            'Created At': datetime.now().isoformat(),
+        }
+        firestore.client().collection('time_entries').add(data)
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
+    flash('CSV imported')
     return redirect(url_for('index'))
 
 @app.route('/report')
@@ -367,12 +374,13 @@ def weekly_download():
 def uploaded(filename):
     return send_from_directory(UPLOAD_FOLDER, filename, as_attachment=True)
 
-@app.route('/edit/<int:index>', methods=['GET', 'POST'])
-def edit(index):
-    entries = _read_entries()
-    if index < 0 or index >= len(entries):
+@app.route('/edit/<entry_id>', methods=['GET', 'POST'])
+def edit(entry_id):
+    doc_ref = firestore.client().collection('time_entries').document(entry_id)
+    snap = doc_ref.get()
+    if not snap.exists:
         abort(404)
-    row = entries[index]
+    row = _map_row(snap.to_dict())
     created_str = row.get('Created At', datetime.now().isoformat())
     if not isinstance(created_str, str):
         created_str = str(created_str)
@@ -392,37 +400,16 @@ def edit(index):
         row['To Time'] = request.form['to_time']
         row['Task'] = request.form['task']
         row['Description'] = request.form.get('description', '')
-        entries[index] = row
-        if DB_URL:
-            with get_conn() as conn:
-                with conn.cursor() as cur:
-                    cur.execute(
-                        f"UPDATE {TABLE_NAME} SET date=%s, from_time=%s, to_time=%s, task=%s, description=%s WHERE id=%s",
-                        (
-                            row['Date'],
-                            row['From Time'],
-                            row['To Time'],
-                            row['Task'],
-                            row['Description'],
-                            row.get('id'),
-                        ),
-                    )
-                    conn.commit()
-
-        else:
-            with open(CSV_FILE, 'w', newline='') as f:
-                writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-                writer.writeheader()
-                writer.writerows(entries)
+        doc_ref.update(row)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': True})
         flash('Entry updated')
         return redirect(url_for('index'))
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         data = dict(row)
-        data['index'] = index
+        data['id'] = entry_id
         return jsonify(data)
-    return render_template('edit.html', row=row, index=index)
+    return render_template('edit.html', row=row, index=entry_id)
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
