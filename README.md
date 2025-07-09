@@ -44,4 +44,10 @@ Create a Firebase project and generate a service account key for Firestore acces
 5. Ensure the Python version is pinned (e.g., `runtime.txt` with `python-3.11.9`)
 6. Done ✅
 
+### Automatic deployment from GitHub
+Create a Deploy Hook in Render for your web service and add the hook URL as a
+`RENDER_DEPLOY_HOOK_URL` secret in your GitHub repository. The included
+GitHub Actions workflow triggers this hook whenever a commit is pushed to the
+`main` branch.
+
 > If you face any issues: increase instance memory, check logs, or email dev@sharpeconomy.org

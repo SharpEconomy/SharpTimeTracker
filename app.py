@@ -192,8 +192,6 @@ def add():
         path = os.path.join(UPLOAD_FOLDER, fname)
         uploaded.save(path)
         filename = fname
-    entries = _read_entries()
-    index = len(entries)
     row = {
         'Name': request.form['name'],
         'Date': today,
