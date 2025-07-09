@@ -170,6 +170,7 @@ def index():
         hrs = int(e['hours'])
         mins = int(round((e['hours'] - hrs) * 60))
         e['duration_str'] = f"{hrs}h {mins}m"
+        e['duration_hm'] = f"{hrs}:{mins:02d}"
         e['date_display'] = _format_date(e['Date'], show_year)
 
     grouped = defaultdict(list)
@@ -228,6 +229,7 @@ def add():
                 'date_display': _format_date(row['Date'], show_year),
                 'hours': hours,
                 'duration_str': f"{int(hours)}h {int(round((hours-int(hours))*60))}m",
+                'duration_hm': f"{int(hours)}:{int(round((hours-int(hours))*60)):02d}",
                 'task': row['Task'],
                 'description_html': _linkify(row['Description']),
                 'file_link': f'<a href="/uploads/{filename}" download target="_blank">{filename}</a>' if filename else '',
