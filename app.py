@@ -20,6 +20,7 @@ from werkzeug.utils import secure_filename
 import json
 import firebase_admin
 from firebase_admin import credentials, firestore
+from google.cloud.firestore_v1 import field_path
 
 app = Flask(__name__)
 
@@ -89,7 +90,13 @@ def _map_row(row: dict) -> dict:
     return out
 
 def _read_entries():
-    docs = firestore.client().collection('time_entries').order_by('Date').order_by('From Time').stream()
+    docs = (
+        firestore.client()
+        .collection('time_entries')
+        .order_by('Date')
+        .order_by(field_path.FieldPath('From Time'))
+        .stream()
+    )
     entries = []
     for doc in docs:
         row = doc.to_dict()
