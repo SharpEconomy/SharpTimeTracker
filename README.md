@@ -1,7 +1,7 @@
 # Time Tracker App (Render-Ready)
 
-This is a lightweight Flask time tracking app that stores entries in a
-PostgreSQL table on Supabase using `psycopg`. Column names may use spaces
+This is a lightweight Flask time tracking app that stores entries in
+Firebase Firestore using `firebase-admin`. Column names may use spaces
 (e.g. `"From Time"`) or snake case (e.g. `from_time`)—the app converts them
 automatically. Charts are rendered client-side with Chart.js.
 
@@ -13,8 +13,9 @@ automatically. Charts are rendered client-side with Chart.js.
 - Accordion daily log view with inline charts
 - Inline editing popup
 - CSV download (raw + weekly)
+- CSV upload to bulk import entries
 - Sharp Economy branding
-- Stores data in a Supabase PostgreSQL table via `psycopg`
+- Stores data in Firebase Firestore
 
 ## File Structure
 ```
@@ -22,7 +23,6 @@ automatically. Charts are rendered client-side with Chart.js.
 ├── app.py
 ├── render.yaml
 ├── requirements.txt
-├── time_log.csv
 ├── static/
 │   ├── style.css
 │   └── logo.png
@@ -31,7 +31,10 @@ automatically. Charts are rendered client-side with Chart.js.
     └── report.html
 ```
 
-Copy `.env.sample` to `.env` and fill in `SUPABASE_DB_URL` and `FLASK_SECRET_KEY` before running the app. Run `python migrate_to_supabase.py` once to create the database table and import the sample CSV.
+Copy `.env.sample` to `.env` and fill in `FIREBASE_CERT` (the service account JSON) and `FLASK_SECRET_KEY` before running the app. The Firestore collection will be created automatically on first run.
+
+### Required Firebase credentials
+Create a Firebase project and generate a service account key for Firestore access. Paste the JSON for that key into the `FIREBASE_CERT` environment variable on Render. No other credentials are required.
 
 ## Deployment on Render
 1. Push to a Git repo
