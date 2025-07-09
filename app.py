@@ -17,7 +17,8 @@ from flask import (
     abort,
 )
 from werkzeug.utils import secure_filename
-from supabase import create_client
+import psycopg2
+from psycopg2.extras import RealDictCursor
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
@@ -35,14 +36,9 @@ FIELDNAMES = [
     'Created At',
 ]
 
-SUPABASE_URL = os.environ.get('SUPABASE_URL')
-SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+DB_URL = os.environ.get('SUPABASE_DB_URL') or os.environ.get('DATABASE_URL')
 TABLE_NAME = 'time_entries'
-supabase = (
-    create_client(SUPABASE_URL, SUPABASE_KEY)
-    if SUPABASE_URL and SUPABASE_KEY
-    else None
-)
+conn = psycopg2.connect(DB_URL) if DB_URL else None
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -70,11 +66,16 @@ def _map_row(row: dict) -> dict:
     return out
 
 def _read_entries():
-    if supabase:
-        resp = supabase.table(TABLE_NAME).select('*').execute()
-        entries = resp.data or []
-        for row in entries:
-            row['Date'] = _canonical_date(row['Date'])
+    if conn:
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY date, from_time")
+            rows = cur.fetchall()
+        entries = []
+        for row in rows:
+            mapped = _map_row(row)
+            mapped['id'] = row.get('id')
+            mapped['Date'] = _canonical_date(mapped['Date'])
+            entries.append(mapped)
         return entries
     entries = []
     if os.path.exists(CSV_FILE):
@@ -107,6 +108,10 @@ def _canonical_date(date_str):
 def _format_date(date_str, show_year=False):
     dt = _parse_date(date_str)
     return dt.strftime('%m/%d/%Y' if show_year else '%m/%d')
+
+def _format_date_long(date_str):
+    dt = _parse_date(date_str)
+    return dt.strftime('%-d %B')
 
 @app.template_filter('linkify')
 def _linkify(text):
@@ -201,8 +206,23 @@ def add():
         'File': filename,
         'Created At': datetime.now().isoformat(),
     }
-    if supabase:
-        supabase.table(TABLE_NAME).insert(row).execute()
+    if conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                f"INSERT INTO {TABLE_NAME} (name, date, from_time, to_time, task, description, file, created_at) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    row['Name'],
+                    row['Date'],
+                    row['From Time'],
+                    row['To Time'],
+                    row['Task'],
+                    row['Description'],
+                    row['File'],
+                    row['Created At'],
+                ),
+            )
+            conn.commit()
     else:
         with open(CSV_FILE, 'a', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
@@ -271,15 +291,18 @@ def week_data():
     if not start:
         return jsonify({'error': 'missing start'}), 400
     dt = _parse_date(start)
-    days = [(dt + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
-    labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-    entries = [e for e in _read_entries() if _canonical_date(e['Date']) in days]
+    days = [(dt + timedelta(days=i)) for i in range(7)]
+    day_keys = [d.strftime('%Y-%m-%d') for d in days]
+    labels = [_format_date_long(d.strftime('%Y-%m-%d')) for d in days]
+    entries = [e for e in _read_entries() if _canonical_date(e['Date']) in day_keys]
     data = defaultdict(lambda: defaultdict(float))
+    weekday_labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
     for e in entries:
         d = _parse_date(e['Date']).weekday()
-        data[labels[d]][e['Name']] += _hours(e['From Time'], e['To Time'])
+        key = weekday_labels[d]
+        data[key][e['Name']] += _hours(e['From Time'], e['To Time'])
     names = sorted({n for d in data.values() for n in d.keys()})
-    hours = {name: [data[lab].get(name, 0) for lab in labels] for name in names}
+    hours = {name: [data[weekday_labels[i]].get(name, 0) for i in range(7)] for name in names}
     return jsonify({'days': labels, 'names': names, 'hours': hours})
 
 @app.route('/download')
@@ -357,8 +380,20 @@ def edit(index):
         row['Task'] = request.form['task']
         row['Description'] = request.form.get('description', '')
         entries[index] = row
-        if supabase:
-            supabase.table(TABLE_NAME).update(row).eq('id', row.get('id')).execute()
+        if conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    f"UPDATE {TABLE_NAME} SET date=%s, from_time=%s, to_time=%s, task=%s, description=%s WHERE id=%s",
+                    (
+                        row['Date'],
+                        row['From Time'],
+                        row['To Time'],
+                        row['Task'],
+                        row['Description'],
+                        row.get('id'),
+                    ),
+                )
+                conn.commit()
         else:
             with open(CSV_FILE, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
