@@ -271,18 +271,38 @@ def import_csv():
     uploaded = request.files.get('csv')
     if not uploaded or not uploaded.filename:
         return jsonify({'error': 'no file'}), 400
-    # remove existing data
     col = firestore.client().collection('time_entries')
+
+    # build set of existing entries to avoid duplicates (date+duration+task)
+    existing = set()
     for doc in col.stream():
-        col.document(doc.id).delete()
+        d = doc.to_dict()
+        key = (
+            _canonical_date(d.get('Date', '')),
+            d.get('Duration', ''),
+            d.get('Task', ''),
+        )
+        existing.add(key)
+
+    seen = set()
 
     reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
     today = datetime.now().strftime('%Y-%m-%d')
     for row in reader:
+        date = _canonical_date(row.get('Date', datetime.now().strftime('%Y-%m-%d')))
         duration = row.get('Duration', '')
+        task = row.get('Task', '')
+        key = (date, duration, task)
+        if key in existing or key in seen:
+            continue
+        seen.add(key)
         data = {
-            'Date': today,
+            'Name': row.get('Name', ''),
+            'Date': date,
             'Duration': duration,
+            'Task': task,
+            'Description': row.get('Description', ''),
+            'File': row.get('File', ''),
             'Created At': datetime.now().isoformat(),
         }
         col.add(data)
