@@ -22,7 +22,19 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
+
+
+def _read_secret(name: str) -> str | None:
+    path = os.path.join('/etc/secrets', name)
+    if os.path.exists(path):
+        with open(path) as f:
+            return f.read().strip()
+    return None
+
+
+app.secret_key = _read_secret('flask_secret_key') or os.environ.get(
+    'FLASK_SECRET_KEY', 'replace-me'
+)
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 FIELDNAMES = [
