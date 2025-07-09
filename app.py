@@ -49,12 +49,19 @@ FIELDNAMES = [
 ]
 
 # Firebase initialization
-cred_json = os.environ.get('FIREBASE_CERT')
-if cred_json:
-    cred = credentials.Certificate(json.loads(cred_json))
+cert_path = os.path.join(
+    '/etc/secrets', 'sharptimetracker-firebase-adminsdk-fbsvc-973348138e.json'
+)
+if os.path.exists(cert_path):
+    cred = credentials.Certificate(cert_path)
     firebase_admin.initialize_app(cred)
 else:
-    raise RuntimeError('FIREBASE_CERT not set')
+    cred_json = os.environ.get('FIREBASE_CERT')
+    if cred_json:
+        cred = credentials.Certificate(json.loads(cred_json))
+        firebase_admin.initialize_app(cred)
+    else:
+        raise RuntimeError('Firebase credentials not found')
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
