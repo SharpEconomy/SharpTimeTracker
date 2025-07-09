@@ -31,8 +31,7 @@ client-side with Chart.js.
     └── report.html
 ```
 
-Copy `.env.sample` to `.env` and fill in `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
-and `FLASK_SECRET_KEY` before running the app.
+Copy `.env.sample` to `.env` and fill in `SUPABASE_DB_URL` and `FLASK_SECRET_KEY` before running the app. Run `python migrate_to_supabase.py` once to create the database table and import the sample CSV.
 
 ## Deployment on Render
 1. Push to a Git repo

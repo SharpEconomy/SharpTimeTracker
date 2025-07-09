@@ -35,6 +35,11 @@ td {
 
 .chart-container {
     overflow-x: auto;
+    width: 100%;
+}
+
+.chart-container canvas {
+    width: 100% !important;
 }
 
 .attach-btn {

@@ -1,17 +1,65 @@
 import os
 import csv
 from datetime import datetime
-from supabase import create_client
+import psycopg2
 
-url = os.environ.get('SUPABASE_URL')
-key = os.environ.get('SUPABASE_SERVICE_KEY')
-if not url or not key:
-    raise SystemExit('Missing SUPABASE_URL or SUPABASE_SERVICE_KEY')
-client = create_client(url, key)
-TABLE = 'time_entries'
+DB_URL = os.environ.get("SUPABASE_DB_URL") or os.environ.get("DATABASE_URL")
+if not DB_URL:
+    raise SystemExit("Missing SUPABASE_DB_URL or DATABASE_URL")
 
-with open('time_log.csv', newline='') as f:
+TABLE = "time_entries"
+
+conn = psycopg2.connect(DB_URL)
+cur = conn.cursor()
+
+cur.execute(
+    f"""
+    CREATE TABLE IF NOT EXISTS {TABLE} (
+        id SERIAL PRIMARY KEY,
+        name TEXT,
+        date DATE,
+        from_time TEXT,
+        to_time TEXT,
+        task TEXT,
+        description TEXT,
+        file TEXT,
+        created_at TIMESTAMPTZ
+    )
+    """
+)
+conn.commit()
+
+
+def parse_date(s: str) -> str:
+    for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y", "%m/%d/%Y", "%d/%m/%Y"):
+        try:
+            return datetime.strptime(s, fmt).date().isoformat()
+        except ValueError:
+            pass
+    try:
+        return datetime.fromisoformat(s).date().isoformat()
+    except ValueError:
+        return datetime.now().date().isoformat()
+
+
+with open("time_log.csv", newline="") as f:
     reader = csv.DictReader(f)
     for row in reader:
-        row.setdefault('Created At', datetime.now().isoformat())
-        client.table(TABLE).insert(row).execute()
+        created = row.get("Created At") or datetime.now().isoformat()
+        cur.execute(
+            f"INSERT INTO {TABLE} (name, date, from_time, to_time, task, description, file, created_at) "
+            "VALUES (%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                row.get("Name"),
+                parse_date(row.get("Date", "")),
+                row.get("From Time"),
+                row.get("To Time"),
+                row.get("Task"),
+                row.get("Description"),
+                row.get("File"),
+                created,
+            ),
+        )
+conn.commit()
+cur.close()
+conn.close()
