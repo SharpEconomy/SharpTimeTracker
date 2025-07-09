@@ -285,7 +285,9 @@ def import_csv():
         existing.add(key)
 
     seen = set()
+
     reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
+    today = datetime.now().strftime('%Y-%m-%d')
     for row in reader:
         date = _canonical_date(row.get('Date', datetime.now().strftime('%Y-%m-%d')))
         duration = row.get('Duration', '')
