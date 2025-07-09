@@ -58,6 +58,16 @@
         </div>
     </form>
     </div>
+    <div class="card p-4 mb-4">
+    <form id="csv-form" class="row g-3" enctype="multipart/form-data">
+        <div class="col-md-6">
+            <input type="file" name="csv" accept=".csv" class="form-control" required>
+        </div>
+        <div class="col-md-2 d-grid">
+            <button type="submit" class="btn btn-secondary">Upload CSV</button>
+        </div>
+    </form>
+    </div>
     {% if grouped %}
     <div class="accordion" id="day-accordion">
     {% for date, rows in grouped.items() %}
@@ -91,7 +101,7 @@
                                 <td>{{ row['Task'] }}</td>
                                 <td>{{ row['Description']|linkify|safe }}</td>
                                 <td>{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
-                                <td><button class="btn btn-sm btn-secondary edit-btn" data-index="{{ row.index }}">Edit</button></td>
+                                <td><button class="btn btn-sm btn-secondary edit-btn" data-id="{{ row['id'] }}">Edit</button></td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -191,11 +201,11 @@ document.addEventListener('DOMContentLoaded', function(){
 
     document.querySelectorAll('.edit-btn').forEach(btn=>{
         btn.addEventListener('click', ()=>{
-            const idx = btn.dataset.index;
-            fetch(`/edit/${idx}`, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+            const id = btn.dataset.id;
+            fetch(`/edit/${id}`, {headers:{'X-Requested-With':'XMLHttpRequest'}})
                 .then(r=>r.json())
                 .then(row=>{
-                    editForm.dataset.index = idx;
+                    editForm.dataset.id = id;
                     editForm.date.value = row.Date;
                     editForm.from_time.value = row['From Time'];
                     editForm.to_time.value = row['To Time'];
@@ -208,10 +218,16 @@ document.addEventListener('DOMContentLoaded', function(){
 
     editForm.addEventListener('submit', e=>{
         e.preventDefault();
-        const idx = editForm.dataset.index;
+        const id = editForm.dataset.id;
         const fd = new FormData(editForm);
-        fetch(`/edit/${idx}`, {method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
+        fetch(`/edit/${id}`, {method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
             .then(()=>location.reload());
+    });
+
+    document.getElementById('csv-form').addEventListener('submit', e=>{
+        e.preventDefault();
+        const fd = new FormData(e.target);
+        fetch('/import', {method:'POST', body:fd}).then(()=>location.reload());
     });
 
     document.querySelectorAll('.day-chart').forEach(c=>{

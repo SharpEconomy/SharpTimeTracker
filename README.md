@@ -1,7 +1,7 @@
 # Time Tracker App (Render-Ready)
 
-This is a lightweight Flask time tracking app that stores entries in a
-PostgreSQL table on Supabase using `psycopg`. Column names may use spaces
+This is a lightweight Flask time tracking app that stores entries in
+Firebase Firestore using `firebase-admin`. Column names may use spaces
 (e.g. `"From Time"`) or snake case (e.g. `from_time`)—the app converts them
 automatically. Charts are rendered client-side with Chart.js.
 
@@ -13,8 +13,9 @@ automatically. Charts are rendered client-side with Chart.js.
 - Accordion daily log view with inline charts
 - Inline editing popup
 - CSV download (raw + weekly)
+- CSV upload to bulk import entries
 - Sharp Economy branding
-- Stores data in a Supabase PostgreSQL table via `psycopg`
+- Stores data in Firebase Firestore
 
 ## File Structure
 ```
@@ -22,7 +23,6 @@ automatically. Charts are rendered client-side with Chart.js.
 ├── app.py
 ├── render.yaml
 ├── requirements.txt
-├── time_log.csv
 ├── static/
 │   ├── style.css
 │   └── logo.png
@@ -31,7 +31,15 @@ automatically. Charts are rendered client-side with Chart.js.
     └── report.html
 ```
 
-Copy `.env.sample` to `.env` and fill in `SUPABASE_DB_URL` and `FLASK_SECRET_KEY` before running the app. Run `python migrate_to_supabase.py` once to create the database table and import the sample CSV.
+Create two Secret Files in Render:
+
+1. `sharptimetracker-firebase-adminsdk-fbsvc-973348138e.json` – your Firebase service account JSON
+2. `flask_secret_key` – a random string for Flask sessions
+
+These files are mounted at `/etc/secrets/` when the service starts and the app reads them automatically. No `.env` file is required.
+
+### Required Firebase credentials
+Create a Firebase project and generate a service account key for Firestore access. Upload the JSON file to Render as the secret file `sharptimetracker-firebase-adminsdk-fbsvc-973348138e.json`. The app reads this file from `/etc/secrets` when it starts. No environment variables are required.
 
 ## Deployment on Render
 1. Push to a Git repo
@@ -40,5 +48,11 @@ Copy `.env.sample` to `.env` and fill in `SUPABASE_DB_URL` and `FLASK_SECRET_KEY
 4. Select `render.yaml` as setup guide
 5. Ensure the Python version is pinned (e.g., `runtime.txt` with `python-3.11.9`)
 6. Done ✅
+
+### Automatic deployment from GitHub
+Create a Deploy Hook in Render for your web service and add the hook URL as a
+`RENDER_DEPLOY_HOOK_URL` secret in your GitHub repository. The included
+GitHub Actions workflow triggers this hook whenever a commit is pushed to the
+`main` branch. Ensure the secret is set, otherwise the workflow will fail.
 
 > If you face any issues: increase instance memory, check logs, or email dev@sharpeconomy.org
