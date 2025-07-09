@@ -1,10 +1,9 @@
 # Time Tracker App (Render-Ready)
 
-This is a lightweight Flask time tracking app that reads and writes entries to
-a local CSV file. Column names may use spaces (e.g. `"From Time"`) or snake case
+This is a lightweight Flask time tracking app that stores entries in a Supabase
+table. Column names may use spaces (e.g. `"From Time"`) or snake case
 (e.g. `from_time`)—the app will convert automatically. Charts are rendered
-client-side with Chart.js. All entries are written to and read from
-`time_log.csv` so your data persists across restarts.
+client-side with Chart.js.
 
 ## Features
 - User signup (name & email)
@@ -31,6 +30,9 @@ client-side with Chart.js. All entries are written to and read from
     ├── index.html
     └── report.html
 ```
+
+Copy `.env.sample` to `.env` and fill in `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`
+and `FLASK_SECRET_KEY` before running the app.
 
 ## Deployment on Render
 1. Push to a Git repo

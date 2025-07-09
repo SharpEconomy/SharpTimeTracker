@@ -17,9 +17,10 @@ from flask import (
     abort,
 )
 from werkzeug.utils import secure_filename
+from supabase import create_client
 
 app = Flask(__name__)
-app.secret_key = 'secret123'
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "replace-me")
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 CSV_FILE = os.path.join(BASE_DIR, 'time_log.csv')
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
@@ -34,41 +35,16 @@ FIELDNAMES = [
     'Created At',
 ]
 
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+SUPABASE_URL = os.environ.get('SUPABASE_URL')
+SUPABASE_KEY = os.environ.get('SUPABASE_SERVICE_KEY')
+TABLE_NAME = 'time_entries'
+supabase = (
+    create_client(SUPABASE_URL, SUPABASE_KEY)
+    if SUPABASE_URL and SUPABASE_KEY
+    else None
+)
 
-def _ensure_csv():
-    if not os.path.exists(CSV_FILE):
-        with open(CSV_FILE, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-        return
-    with open(CSV_FILE, newline='') as f:
-        reader = csv.DictReader(f)
-        rows = list(reader)
-        header = reader.fieldnames or []
-    if not rows:
-        with open(CSV_FILE, 'w', newline='') as f:
-            csv.DictWriter(f, fieldnames=FIELDNAMES).writeheader()
-        return
-    if header == FIELDNAMES:
-        return
-    converted = []
-    for raw in rows:
-        row = _map_row(raw)
-        converted.append({
-            'Name': row.get('Name', ''),
-            'Date': row.get('Date', ''),
-            'From Time': row.get('From Time', ''),
-            'To Time': row.get('To Time', ''),
-            'Task': row.get('Task', ''),
-            'Description': row.get('Description', ''),
-            'File': row.get('File', ''),
-            'Created At': row.get('Created At', datetime.now().isoformat()),
-        })
-    with open(CSV_FILE, 'w', newline='') as f:
-        writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-        writer.writeheader()
-        writer.writerows(converted)
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 def _map_row(row: dict) -> dict:
     key_map = {
@@ -94,18 +70,17 @@ def _map_row(row: dict) -> dict:
     return out
 
 def _read_entries():
-    _ensure_csv()
+    if supabase:
+        resp = supabase.table(TABLE_NAME).select('*').execute()
+        entries = resp.data or []
+        for row in entries:
+            row['Date'] = _canonical_date(row['Date'])
+        return entries
     entries = []
     if os.path.exists(CSV_FILE):
         with open(CSV_FILE, newline='') as file:
             reader = csv.DictReader(file)
             for row in reader:
-                if 'File' not in row:
-                    row['File'] = ''
-                if 'Description' not in row:
-                    row['Description'] = ''
-                if 'Created At' not in row:
-                    row['Created At'] = datetime.now().isoformat()
                 row['Date'] = _canonical_date(row['Date'])
                 entries.append(row)
     return entries
@@ -162,6 +137,10 @@ def _weekday_summary(entries):
         key = labels[dt.weekday()]
         days[key][row['Name']] += _hours(row['From Time'], row['To Time'])
     return days
+
+def _week_list(entries):
+    weeks = sorted(_weekly_summary(entries).keys())
+    return weeks
 
 
 @app.route('/')
@@ -222,9 +201,12 @@ def add():
         'File': filename,
         'Created At': datetime.now().isoformat(),
     }
-    with open(CSV_FILE, 'a', newline='') as file:
-        writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
-        writer.writerow(row)
+    if supabase:
+        supabase.table(TABLE_NAME).insert(row).execute()
+    else:
+        with open(CSV_FILE, 'a', newline='') as file:
+            writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
+            writer.writerow(row)
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         hours = _hours(row['From Time'], row['To Time'])
@@ -278,6 +260,28 @@ def weekdays_data():
     hours = {name: [days[lab].get(name, 0) for lab in labels] for name in names}
     return jsonify({'days': labels, 'names': names, 'hours': hours})
 
+@app.route('/week-list')
+def week_list():
+    weeks = _week_list(_read_entries())
+    return jsonify({'weeks': weeks})
+
+@app.route('/week-data')
+def week_data():
+    start = request.args.get('start')
+    if not start:
+        return jsonify({'error': 'missing start'}), 400
+    dt = _parse_date(start)
+    days = [(dt + timedelta(days=i)).strftime('%Y-%m-%d') for i in range(7)]
+    labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+    entries = [e for e in _read_entries() if _canonical_date(e['Date']) in days]
+    data = defaultdict(lambda: defaultdict(float))
+    for e in entries:
+        d = _parse_date(e['Date']).weekday()
+        data[labels[d]][e['Name']] += _hours(e['From Time'], e['To Time'])
+    names = sorted({n for d in data.values() for n in d.keys()})
+    hours = {name: [data[lab].get(name, 0) for lab in labels] for name in names}
+    return jsonify({'days': labels, 'names': names, 'hours': hours})
+
 @app.route('/download')
 def download():
     entries = _read_entries()
@@ -285,6 +289,7 @@ def download():
     with open(file, 'w', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([
+            'Name',
             'Date',
             'From Time',
             'To Time',
@@ -295,6 +300,7 @@ def download():
         ])
         for e in entries:
             writer.writerow([
+                e.get('Name', ''),
                 e['Date'],
                 e['From Time'],
                 e['To Time'],
@@ -351,10 +357,13 @@ def edit(index):
         row['Task'] = request.form['task']
         row['Description'] = request.form.get('description', '')
         entries[index] = row
-        with open(CSV_FILE, 'w', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
-            writer.writeheader()
-            writer.writerows(entries)
+        if supabase:
+            supabase.table(TABLE_NAME).update(row).eq('id', row.get('id')).execute()
+        else:
+            with open(CSV_FILE, 'w', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=FIELDNAMES)
+                writer.writeheader()
+                writer.writerows(entries)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': True})
         flash('Entry updated')

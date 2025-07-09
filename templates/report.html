@@ -27,12 +27,12 @@
     </div>
     <div class="row mt-3">
         <div class="col-md-3">
-            <label class="form-label">Person</label>
-            <select id="person-filter" class="form-select"><option value="">-- Select --</option></select>
+            <label class="form-label">Week Starting</label>
+            <select id="week-filter" class="form-select"></select>
         </div>
         <div class="col-md-3">
-            <label class="form-label">Day</label>
-            <select id="day-filter" class="form-select"><option value="">-- Select --</option></select>
+            <label class="form-label">User</label>
+            <select id="user-filter" class="form-select"><option value="">All</option></select>
         </div>
     </div>
     <div id="summary" class="mt-3"></div>
@@ -40,73 +40,51 @@
     <a href="/" class="btn btn-secondary mt-3">Back to Log</a>
 </div>
 <script>
-let weekdaysData, dailyData, chart;
-fetch('/weekdays-data').then(res => res.json()).then(data => {
-    const canvas = document.getElementById('weekly-chart');
-    const ctx = canvas.getContext('2d');
-    const labels = data.days;
+let currentData, chart;
+const canvas = document.getElementById('weekly-chart');
+const ctx = canvas.getContext('2d');
 
-    const makeDatasets = names => names.map((n, i) => ({
-        label: n,
-        data: data.hours[n],
-        backgroundColor: `hsl(${(i * 40) % 360},70%,60%)`
+function makeDatasets(data, users) {
+    return users.map((u,i)=>({
+        label:u,
+        data:data.hours[u],
+        backgroundColor:`hsl(${(i*40)%360},70%,60%)`
     }));
+}
 
-    const updateWidth = count => {
-        canvas.width = labels.length * count * 40;
-    };
+function updateChart(data, user='') {
+    const users = user ? [user] : data.names;
+    chart.data.labels = data.days;
+    chart.data.datasets = makeDatasets(data, users);
+    canvas.width = data.days.length * users.length * 40;
+    chart.update();
+}
 
-    chart = new Chart(ctx, {
-        type: 'bar',
-        data: { labels: labels, datasets: makeDatasets(data.names) },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: { title: { display: true, text: 'Hours Per Day' } },
-            scales: { x: { stacked: false }, y: { stacked: false, beginAtZero: true } }
+function loadWeek(week) {
+    fetch(`/week-data?start=${week}`).then(r=>r.json()).then(d => {
+        currentData = d;
+        const userSel = document.getElementById('user-filter');
+        userSel.innerHTML = '<option value="">All</option>';
+        d.names.forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent=n;userSel.appendChild(o);});
+        if(!chart){
+            chart = new Chart(ctx,{type:'bar',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:false,plugins:{title:{display:true,text:'Hours Per Day'}},scales:{y:{beginAtZero:true}}}});
         }
+        updateChart(d, userSel.value);
     });
-    updateWidth(data.names.length);
+}
 
-    weekdaysData = data;
-    const personSelect = document.getElementById('person-filter');
-    data.names.forEach(n => {
-        const opt = document.createElement('option');
-        opt.value = n; opt.textContent = n; personSelect.appendChild(opt);
-    });
-
-    personSelect.addEventListener('change', () => {
-        const name = personSelect.value;
-        const names = name ? [name] : data.names;
-        chart.data.datasets = makeDatasets(names);
-        updateWidth(names.length);
-        chart.update();
-    });
+fetch('/week-list').then(r=>r.json()).then(d => {
+    const weekSel = document.getElementById('week-filter');
+    d.weeks.forEach(w=>{const o=document.createElement('option');o.value=w;o.textContent=w;weekSel.appendChild(o);});
+    if(d.weeks.length){
+        weekSel.value = d.weeks[d.weeks.length-1];
+        loadWeek(weekSel.value);
+    }
+    weekSel.addEventListener('change',()=>loadWeek(weekSel.value));
 });
 
-fetch('/daily-data').then(r=>r.json()).then(d => {
-    dailyData = d;
-    const daySel = document.getElementById('day-filter');
-    d.dates.forEach(date => {
-        const opt = document.createElement('option');
-        opt.value = date; opt.textContent = date; daySel.appendChild(opt);
-    });
-});
-
-const summary = document.getElementById('summary');
-
-document.getElementById('day-filter').addEventListener('change', e => {
-    if(!dailyData) return;
-    const day = e.target.value;
-    if(!day) { summary.textContent=''; return; }
-    const idx = dailyData.dates.indexOf(day);
-    let html = '<h5>Hours on '+day+'</h5><ul>';
-    dailyData.names.forEach(n => {
-        const h = dailyData.hours[n][idx] || 0;
-        html += `<li>${n}: ${h.toFixed(2)}h ${h>=8?'✓':'✗'}</li>`;
-    });
-    html += '</ul>';
-    summary.innerHTML = html;
+document.getElementById('user-filter').addEventListener('change',()=>{
+    if(currentData) updateChart(currentData, document.getElementById('user-filter').value);
 });
 </script>
 </body>
