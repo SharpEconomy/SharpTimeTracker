@@ -2,18 +2,19 @@
 
 This is a lightweight Flask time tracking app that stores entries in
 Firebase Firestore using `firebase-admin`. Column names may use spaces
-(e.g. `"From Time"`) or snake case (e.g. `from_time`)—the app converts them
-automatically. Charts are rendered client-side with Chart.js.
+or snake case—the app converts them automatically. Charts are rendered
+client-side with Chart.js.
 
 ## Features
 - User signup (name & email)
-- Time tracking (with from–to time, task, and description)
+- Time tracking (with duration, task, and description)
 - Daily log viewer
 - Weekly report using Chart.js with day-by-day bars
 - Accordion daily log view with inline charts
 - Inline editing popup
 - CSV download (raw + weekly)
-- CSV upload to bulk import entries
+- CSV upload to bulk import entries. The CSV format uses the columns:
+  `Name, Date, Duration, Task, Description, File`.
 - Sharp Economy branding
 - Stores data in Firebase Firestore
 

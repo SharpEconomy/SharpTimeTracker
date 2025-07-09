@@ -41,8 +41,7 @@ UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
 FIELDNAMES = [
     'Name',
     'Date',
-    'From Time',
-    'To Time',
+    'Duration',
     'Task',
     'Description',
     'File',
@@ -70,11 +69,10 @@ def _map_row(row: dict) -> dict:
     key_map = {
         'name': 'Name',
         'date': 'Date',
-        'from_time': 'From Time',
-        'to_time': 'To Time',
         'task': 'Task',
         'description': 'Description',
         'file': 'File',
+        'duration': 'Duration',
         'created_at': 'Created At',
         'created at': 'Created At',
     }
@@ -94,7 +92,6 @@ def _read_entries():
         firestore.client()
         .collection('time_entries')
         .order_by('Date')
-        .order_by(field_path.FieldPath('From Time').to_api_repr())
         .stream()
     )
     entries = []
@@ -106,14 +103,31 @@ def _read_entries():
         entries.append(mapped)
     return entries
 
-def _hours(from_t, to_t):
-    fmt = '%H:%M'
-    return (datetime.strptime(to_t, fmt) - datetime.strptime(from_t, fmt)).seconds / 3600
+def _hours(duration: str) -> float:
+    """Return hours as float based on a duration string."""
+    return _parse_duration(duration)
 
 def _hm(hours: float) -> str:
     hrs = int(hours)
     mins = int(round((hours - hrs) * 60))
     return f"{hrs}:{mins:02d}"
+
+
+def _parse_duration(dur: str) -> float:
+    """Parse a duration like '1:30' or '1.5' into hours."""
+    if not dur:
+        return 0.0
+    dur = dur.strip().lower().replace('h', '').replace('hrs', '').replace('hours', '')
+    if ':' in dur:
+        h, m = dur.split(':', 1)
+        try:
+            return int(h) + int(m) / 60
+        except ValueError:
+            return 0.0
+    try:
+        return float(dur)
+    except ValueError:
+        return 0.0
 
 def _parse_date(date_str):
     formats = ['%Y-%m-%d', '%m-%d-%Y', '%d-%m-%Y', '%m/%d/%Y', '%d/%m/%Y']
@@ -149,14 +163,14 @@ def _weekly_summary(entries):
         dt = _parse_date(row['Date'])
         week_start = dt - timedelta(days=dt.weekday())
         key = week_start.strftime('%Y-%m-%d')
-        weekly[key][row['Name']] += _hours(row['From Time'], row['To Time'])
+        weekly[key][row['Name']] += _hours(row.get('Duration', ''))
     return weekly
 
 def _daily_summary(entries):
     daily = defaultdict(lambda: defaultdict(float))
     for row in entries:
         key = _canonical_date(row['Date'])
-        daily[key][row['Name']] += _hours(row['From Time'], row['To Time'])
+        daily[key][row['Name']] += _hours(row.get('Duration', ''))
     return daily
 
 def _weekday_summary(entries):
@@ -165,7 +179,7 @@ def _weekday_summary(entries):
     for row in entries:
         dt = _parse_date(row['Date'])
         key = labels[dt.weekday()]
-        days[key][row['Name']] += _hours(row['From Time'], row['To Time'])
+        days[key][row['Name']] += _hours(row.get('Duration', ''))
     return days
 
 def _week_list(entries):
@@ -179,7 +193,7 @@ def index():
     years = {_parse_date(e['Date']).year for e in entries}
     show_year = any(year != 2025 for year in years)
     for e in entries:
-        e['hours'] = _hours(e['From Time'], e['To Time'])
+        e['hours'] = _hours(e.get('Duration', ''))
         hrs = int(e['hours'])
         mins = int(round((e['hours'] - hrs) * 60))
         e['duration_str'] = f"{hrs}h {mins}m"
@@ -221,8 +235,7 @@ def add():
     row = {
         'Name': request.form['name'],
         'Date': today,
-        'From Time': request.form['from_time'],
-        'To Time': request.form['to_time'],
+        'Duration': request.form.get('duration', ''),
         'Task': request.form['task'],
         'Description': request.form.get('description', ''),
         'File': filename,
@@ -233,7 +246,7 @@ def add():
     doc_id = doc_ref.id
 
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        hours = _hours(row['From Time'], row['To Time'])
+        hours = _hours(row.get('Duration', ''))
         years = {_parse_date(r['Date']).year for r in _read_entries()}
         show_year = any(y != 2025 for y in years)
         return jsonify(
@@ -260,11 +273,11 @@ def import_csv():
         return jsonify({'error': 'no file'}), 400
     reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
     for row in reader:
+        duration = row.get('Duration') or ''
         data = {
             'Name': row.get('Name', ''),
             'Date': _canonical_date(row.get('Date', '')),
-            'From Time': row.get('From Time', ''),
-            'To Time': row.get('To Time', ''),
+            'Duration': duration,
             'Task': row.get('Task', ''),
             'Description': row.get('Description', ''),
             'File': row.get('File', ''),
@@ -327,7 +340,7 @@ def week_data():
     for e in entries:
         d = _parse_date(e['Date']).weekday()
         key = weekday_labels[d]
-        data[key][e['Name']] += _hours(e['From Time'], e['To Time'])
+        data[key][e['Name']] += _hours(e.get('Duration', ''))
     names = sorted({n for d in data.values() for n in d.keys()})
     hours = {name: [data[weekday_labels[i]].get(name, 0) for i in range(7)] for name in names}
     return jsonify({'days': labels, 'names': names, 'hours': hours})
@@ -341,9 +354,7 @@ def download():
         writer.writerow([
             'Name',
             'Date',
-            'From Time',
-            'To Time',
-            'Hours',
+            'Duration',
             'Task',
             'Description',
             'File',
@@ -352,9 +363,7 @@ def download():
             writer.writerow([
                 e.get('Name', ''),
                 e['Date'],
-                e['From Time'],
-                e['To Time'],
-                _hm(_hours(e['From Time'], e['To Time'])),
+                _hm(_hours(e.get('Duration', ''))),
                 e['Task'],
                 e['Description'],
                 e['File'],
@@ -402,12 +411,13 @@ def edit(entry_id):
         flash('Editing period expired')
         return redirect(url_for('index'))
     if request.method == 'POST':
-        row['Date'] = _canonical_date(request.form['date'])
-        row['From Time'] = request.form['from_time']
-        row['To Time'] = request.form['to_time']
-        row['Task'] = request.form['task']
-        row['Description'] = request.form.get('description', '')
-        doc_ref.update(row)
+        data = {
+            'Date': _canonical_date(request.form['date']),
+            'Duration': request.form.get('duration', ''),
+            'Task': request.form['task'],
+            'Description': request.form.get('description', ''),
+        }
+        doc_ref.update(data)
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
             return jsonify({'success': True})
         flash('Entry updated')

@@ -15,7 +15,13 @@
             <img src="/static/logo.png" height="40" class="me-2" alt="Logo">
             Sharp Time Tracker
         </a>
-        <div class="ms-auto">
+        <div class="ms-auto d-flex align-items-center">
+            <form id="nav-csv-form" enctype="multipart/form-data" class="d-inline me-2">
+                <input type="file" name="csv" accept=".csv" id="nav-csv-input" class="d-none">
+                <button type="button" id="nav-csv-btn" class="btn btn-outline-light" title="Upload CSV">
+                    <i class="bi bi-upload"></i>
+                </button>
+            </form>
             <a href="/download" class="btn btn-outline-light me-2">Download CSV</a>
             <a href="/report" class="btn btn-outline-light me-2">Weekly Report</a>
         </div>
@@ -34,12 +40,8 @@
             <input name="date" type="date" class="form-control" required>
         </div>
         <div class="col-md-2">
-            <label class="form-label">From</label>
-            <input name="from_time" type="time" class="form-control" required>
-        </div>
-        <div class="col-md-2">
-            <label class="form-label">To</label>
-            <input name="to_time" type="time" class="form-control" required>
+            <label class="form-label">Duration (h:m)</label>
+            <input name="duration" class="form-control" placeholder="1:00" required>
         </div>
         <div class="col-md-2">
             <label class="form-label">Task</label>
@@ -84,8 +86,7 @@
                         <thead>
                             <tr>
                                 <th>Name</th>
-                                <th>From-To</th>
-                                <th>Hours</th>
+                                <th>Duration</th>
                                 <th>Task</th>
                                 <th>Description</th>
                                 <th>File</th>
@@ -96,7 +97,6 @@
                         {% for row in rows %}
                             <tr>
                                 <td>{{ row['Name'] }}</td>
-                                <td>{{ row['From Time'] }}-{{ row['To Time'] }}</td>
                                 <td>{{ row.duration_hm }}</td>
                                 <td>{{ row['Task'] }}</td>
                                 <td>{{ row['Description']|linkify|safe }}</td>
@@ -129,12 +129,8 @@
                 <input type="date" name="date" class="form-control" required>
               </div>
               <div class="col-md-4">
-                <label class="form-label">From</label>
-                <input type="time" name="from_time" class="form-control" required>
-              </div>
-              <div class="col-md-4">
-                <label class="form-label">To</label>
-                <input type="time" name="to_time" class="form-control" required>
+                <label class="form-label">Duration (h:m)</label>
+                <input name="duration" class="form-control" required>
               </div>
               <div class="col-md-6">
                 <label class="form-label">Task</label>
@@ -168,27 +164,11 @@ document.addEventListener('DOMContentLoaded', function(){
     if(storedName) nameField.value = storedName;
     nameField.addEventListener('change', ()=>localStorage.setItem('name', nameField.value));
 
-    const setCurrentTime = () => {
+    const setCurrentDate = () => {
         const now = new Date();
-        const pad = n => n.toString().padStart(2, '0');
         form.querySelector('input[name="date"]').value = now.toISOString().slice(0,10);
-        const timeString = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
-        form.querySelector('input[name="from_time"]').value = timeString;
-        const later = new Date(now.getTime() + 15*60000);
-        const laterStr = `${pad(later.getHours())}:${pad(later.getMinutes())}`;
-        form.querySelector('input[name="to_time"]').value = laterStr;
     };
-    const adjustEndTime = () => {
-        const val = form.querySelector('input[name="from_time"]').value;
-        if(!val) return;
-        const [h,m] = val.split(':').map(Number);
-        const dt = new Date();
-        dt.setHours(h, m + 15);
-        const pad = n=>n.toString().padStart(2,'0');
-        form.querySelector('input[name="to_time"]').value = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-    };
-    setCurrentTime();
-    form.querySelector('input[name="from_time"]').addEventListener('change', adjustEndTime);
+    setCurrentDate();
 
     form.addEventListener('submit', e=>{
         e.preventDefault();
@@ -207,8 +187,7 @@ document.addEventListener('DOMContentLoaded', function(){
                 .then(row=>{
                     editForm.dataset.id = id;
                     editForm.date.value = row.Date;
-                    editForm.from_time.value = row['From Time'];
-                    editForm.to_time.value = row['To Time'];
+                    editForm.duration.value = row.Duration || row.duration_hm;
                     editForm.task.value = row.Task;
                     editForm.description.value = row.Description;
                     editModal.show();
@@ -224,11 +203,26 @@ document.addEventListener('DOMContentLoaded', function(){
             .then(()=>location.reload());
     });
 
-    document.getElementById('csv-form').addEventListener('submit', e=>{
-        e.preventDefault();
-        const fd = new FormData(e.target);
-        fetch('/import', {method:'POST', body:fd}).then(()=>location.reload());
-    });
+    const csvForm = document.getElementById('csv-form');
+    if(csvForm){
+        csvForm.addEventListener('submit', e=>{
+            e.preventDefault();
+            const fd = new FormData(csvForm);
+            fetch('/import', {method:'POST', body:fd}).then(()=>location.reload());
+        });
+    }
+
+    const navInput = document.getElementById('nav-csv-input');
+    const navBtn = document.getElementById('nav-csv-btn');
+    if(navBtn && navInput){
+        navBtn.addEventListener('click', ()=>navInput.click());
+        navInput.addEventListener('change', ()=>{
+            if(!navInput.files.length) return;
+            const fd = new FormData();
+            fd.append('csv', navInput.files[0]);
+            fetch('/import', {method:'POST', body:fd}).then(()=>location.reload());
+        });
+    }
 
     document.querySelectorAll('.day-chart').forEach(c=>{
         const ctx = c.getContext('2d');
