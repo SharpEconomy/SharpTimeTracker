@@ -271,19 +271,21 @@ def import_csv():
     uploaded = request.files.get('csv')
     if not uploaded or not uploaded.filename:
         return jsonify({'error': 'no file'}), 400
+    # remove existing data
+    col = firestore.client().collection('time_entries')
+    for doc in col.stream():
+        col.document(doc.id).delete()
+
     reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
+    today = datetime.now().strftime('%Y-%m-%d')
     for row in reader:
-        duration = row.get('Duration') or ''
+        duration = row.get('Duration', '')
         data = {
-            'Name': row.get('Name', ''),
-            'Date': _canonical_date(row.get('Date', '')),
+            'Date': today,
             'Duration': duration,
-            'Task': row.get('Task', ''),
-            'Description': row.get('Description', ''),
-            'File': row.get('File', ''),
             'Created At': datetime.now().isoformat(),
         }
-        firestore.client().collection('time_entries').add(data)
+        col.add(data)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'success': True})
     flash('CSV imported')
@@ -427,6 +429,14 @@ def edit(entry_id):
         data['id'] = entry_id
         return jsonify(data)
     return render_template('edit.html', row=row, index=entry_id)
+
+@app.route('/delete/<entry_id>', methods=['POST'])
+def delete(entry_id):
+    firestore.client().collection('time_entries').document(entry_id).delete()
+    if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        return jsonify({'success': True})
+    flash('Entry deleted')
+    return redirect(url_for('index'))
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
