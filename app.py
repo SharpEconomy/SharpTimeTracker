@@ -39,7 +39,6 @@ FIELDNAMES = [
 DB_URL = os.environ.get('SUPABASE_DB_URL') or os.environ.get('DATABASE_URL')
 TABLE_NAME = 'time_entries'
 
-
 def get_conn():
     if not DB_URL:
         return None
@@ -76,6 +75,7 @@ def _read_entries():
             with conn.cursor(cursor_factory=RealDictCursor) as cur:
                 cur.execute(f"SELECT * FROM {TABLE_NAME} ORDER BY date, from_time")
                 rows = cur.fetchall()
+
         entries = []
         for row in rows:
             mapped = _map_row(row)
@@ -235,6 +235,7 @@ def add():
                     ),
                 )
                 conn.commit()
+
     else:
         with open(CSV_FILE, 'a', newline='') as file:
             writer = csv.DictWriter(file, fieldnames=FIELDNAMES)
@@ -407,6 +408,7 @@ def edit(index):
                         ),
                     )
                     conn.commit()
+
         else:
             with open(CSV_FILE, 'w', newline='') as f:
                 writer = csv.DictWriter(f, fieldnames=FIELDNAMES)

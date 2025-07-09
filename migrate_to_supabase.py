@@ -29,6 +29,7 @@ with psycopg2.connect(DB_URL) as conn:
         conn.commit()
 
 
+
 def parse_date(s: str) -> str:
     for fmt in ("%Y-%m-%d", "%d-%m-%Y", "%m-%d-%Y", "%m/%d/%Y", "%d/%m/%Y"):
         try:
