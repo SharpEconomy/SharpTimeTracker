@@ -12,8 +12,8 @@ client-side with Chart.js.
 - Weekly report using Chart.js with day-by-day bars
 - Accordion daily log view with inline charts
 - Inline editing popup
-- CSV download (raw + weekly)
-- CSV upload to bulk import entries. The CSV format uses the columns:
+- Excel download (raw + weekly)
+- Upload CSV or Excel to bulk import entries. The spreadsheet format uses the columns:
   `Name, Date, Duration, Task, Description, File`.
 - Sharp Economy branding
 - Stores data in Firebase Firestore
