@@ -29,6 +29,16 @@ td {
     white-space: pre-wrap;
 }
 
+.table-sm th,
+.table-sm td {
+    padding: 0.25rem;
+}
+
+.edit-btn i,
+.delete-btn i {
+    font-size: 1.1rem;
+}
+
 .day-chart {
     max-height: 200px;
 }
