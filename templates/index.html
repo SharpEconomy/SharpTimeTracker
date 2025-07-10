@@ -17,12 +17,12 @@
         </a>
         <div class="ms-auto d-flex align-items-center">
             <form id="nav-csv-form" enctype="multipart/form-data" class="d-inline me-2">
-                <input type="file" name="csv" accept=".csv" id="nav-csv-input" class="d-none">
-                <button type="button" id="nav-csv-btn" class="btn btn-outline-light" title="Upload CSV">
+                <input type="file" name="csv" accept=".csv,.xlsx" id="nav-csv-input" class="d-none">
+                <button type="button" id="nav-csv-btn" class="btn btn-outline-light" title="Upload CSV/Excel">
                     <i class="bi bi-upload"></i>
                 </button>
             </form>
-            <a href="/download" class="btn btn-outline-light me-2">Download CSV</a>
+            <a href="/download" class="btn btn-outline-light me-2">Download Excel</a>
             <a href="/report" class="btn btn-outline-light me-2">Weekly Report</a>
         </div>
     </div>
@@ -85,15 +85,15 @@
                         </thead>
                         <tbody>
                         {% for row in rows %}
-                            <tr>
-                                <td>{{ row['Name'] }}</td>
-                                <td>{{ row.duration_hm }}</td>
-                                <td>{{ row['Task'] }}</td>
-                                <td>{{ row['Description']|linkify|safe }}</td>
-                                <td>{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
+                            <tr data-id="{{ row['id'] }}">
+                                <td class="name-cell">{{ row['Name'] }}</td>
+                                <td class="duration-cell">{{ row.duration_hm }}</td>
+                                <td class="task-cell">{{ row['Task'] }}</td>
+                                <td class="description-cell">{{ row['Description']|linkify|safe }}</td>
+                                <td class="file-cell">{% if row['File'] %}<a href="/uploads/{{ row['File'] }}" target="_blank" download>{{ row['File'] }}</a>{% endif %}</td>
                                 <td>
-                                    <button class="btn btn-sm btn-secondary edit-btn" data-id="{{ row['id'] }}">Edit</button>
-                                    <button class="btn btn-sm btn-danger delete-btn" data-id="{{ row['id'] }}">Delete</button>
+                                    <button class="btn btn-link p-0 edit-btn" data-id="{{ row['id'] }}" title="Edit"><i class="bi bi-pencil-square"></i></button>
+                                    <button class="btn btn-link text-danger p-0 delete-btn" data-id="{{ row['id'] }}" title="Delete"><i class="bi bi-trash"></i></button>
                                 </td>
                             </tr>
                         {% endfor %}
@@ -144,6 +144,9 @@
 </div>
 
 <script>
+function linkify(text){
+    return text.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+}
 document.addEventListener('DOMContentLoaded', function(){
     const form = document.getElementById('entry-form');
     const fileInput = document.getElementById('file-input');
@@ -191,8 +194,11 @@ document.addEventListener('DOMContentLoaded', function(){
     document.querySelectorAll('.delete-btn').forEach(btn=>{
         btn.addEventListener('click', ()=>{
             const id = btn.dataset.id;
-            fetch(`/delete/${id}`, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}})
-                .then(()=>location.reload());
+        fetch(`/delete/${id}`, {method:'POST', headers:{'X-Requested-With':'XMLHttpRequest'}})
+                .then(r=>r.json())
+                .then(()=>{
+                    btn.closest('tr').remove();
+                });
         });
     });
 
@@ -201,7 +207,23 @@ document.addEventListener('DOMContentLoaded', function(){
         const id = editForm.dataset.id;
         const fd = new FormData(editForm);
         fetch(`/edit/${id}`, {method:'POST', body:fd, headers:{'X-Requested-With':'XMLHttpRequest'}})
-            .then(()=>location.reload());
+            .then(r=>r.json())
+            .then(res=>{
+                if(res.success){
+                    fetch(`/edit/${id}`, {headers:{'X-Requested-With':'XMLHttpRequest'}})
+                        .then(r=>r.json())
+                        .then(row=>{
+                            const tr = document.querySelector(`tr[data-id="${id}"]`);
+                            if(tr){
+                                tr.querySelector('.duration-cell').textContent = row.duration_hm;
+                                tr.querySelector('.task-cell').textContent = row.Task;
+                                tr.querySelector('.description-cell').innerHTML = linkify(row.Description);
+                                tr.querySelector('.file-cell').innerHTML = row.File ? `<a href="/uploads/${row.File}" target="_blank" download>${row.File}</a>` : '';
+                            }
+                            editModal.hide();
+                        });
+                }
+            });
     });
 
     const csvForm = document.getElementById('csv-form');
