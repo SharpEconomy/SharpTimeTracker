@@ -72,7 +72,7 @@
             <div id="collapse{{ loop.index }}" class="accordion-collapse collapse" data-bs-parent="#day-accordion">
                 <div class="accordion-body">
                     <canvas class="day-chart" id="chart-{{ loop.index }}" data-hours='{{ totals[date]|tojson }}'></canvas>
-                    <table class="table table-bordered table-striped mt-3">
+                    <table class="table table-bordered table-striped table-sm mt-3 align-middle">
                         <thead>
                             <tr>
                                 <th>Name</th>
