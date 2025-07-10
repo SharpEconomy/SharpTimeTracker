@@ -12,8 +12,8 @@ client-side with Chart.js.
 - Weekly report using Chart.js with day-by-day bars
 - Accordion daily log view with inline charts
 - Inline editing popup
-- CSV download (raw + weekly)
-- CSV upload to bulk import entries. The CSV format uses the columns:
+- Excel download (raw + weekly)
+- Upload CSV or Excel to bulk import entries. The spreadsheet format uses the columns:
   `Name, Date, Duration, Task, Description, File`.
 - Sharp Economy branding
 - Stores data in Firebase Firestore
@@ -53,7 +53,9 @@ Create a Firebase project and generate a service account key for Firestore acces
 ### Automatic deployment from GitHub
 Create a Deploy Hook in Render for your web service and add the hook URL as a
 `RENDER_DEPLOY_HOOK_URL` secret in your GitHub repository. The included
-GitHub Actions workflow triggers this hook whenever a commit is pushed to the
-`main` branch. Ensure the secret is set, otherwise the workflow will fail.
+`render-deploy.yml` workflow installs dependencies, checks that `app.py`
+compiles, and then triggers this hook whenever a commit is pushed to the
+`main` branch or the workflow is run manually. Ensure the secret is set,
+otherwise the workflow will fail.
 
 > If you face any issues: increase instance memory, check logs, or email dev@sharpeconomy.org
