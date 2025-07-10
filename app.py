@@ -91,7 +91,7 @@ def _read_entries():
     docs = (
         firestore.client()
         .collection('time_entries')
-        .order_by('Date')
+        .order_by('Created At', direction=firestore.Query.DESCENDING)
         .stream()
     )
     entries = []
@@ -286,9 +286,23 @@ def import_csv():
 
     seen = set()
 
-    reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
+    ext = os.path.splitext(uploaded.filename)[1].lower()
+    rows = []
+    if ext in ('.xlsx', '.xls'):
+        from openpyxl import load_workbook
+        from io import BytesIO
+        wb = load_workbook(BytesIO(uploaded.read()), data_only=True)
+        ws = wb.active
+        iter_rows = ws.iter_rows(values_only=True)
+        headers = [str(h) for h in next(iter_rows, [])]
+        for values in iter_rows:
+            rows.append({headers[i]: (values[i] if values[i] is not None else '') for i in range(len(headers))})
+    else:
+        reader = csv.DictReader(uploaded.stream.read().decode('utf-8').splitlines())
+        rows = list(reader)
+
     today = datetime.now().strftime('%Y-%m-%d')
-    for row in reader:
+    for row in rows:
         date = _canonical_date(row.get('Date', datetime.now().strftime('%Y-%m-%d')))
         duration = row.get('Duration', '')
         task = row.get('Task', '')
@@ -308,7 +322,7 @@ def import_csv():
         col.add(data)
     if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         return jsonify({'success': True})
-    flash('CSV imported')
+    flash('Data imported')
     return redirect(url_for('index'))
 
 @app.route('/report')
@@ -370,27 +384,34 @@ def week_data():
 @app.route('/download')
 def download():
     entries = _read_entries()
-    file = 'entries.csv'
-    with open(file, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow([
-            'Name',
-            'Date',
-            'Duration',
-            'Task',
-            'Description',
-            'File',
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append([
+        'Name',
+        'Date',
+        'Duration',
+        'Task',
+        'Description',
+        'File',
+    ])
+    for e in entries:
+        ws.append([
+            e.get('Name', ''),
+            e['Date'],
+            _hm(_hours(e.get('Duration', ''))),
+            e['Task'],
+            e['Description'],
+            e['File'],
         ])
-        for e in entries:
-            writer.writerow([
-                e.get('Name', ''),
-                e['Date'],
-                _hm(_hours(e.get('Duration', ''))),
-                e['Task'],
-                e['Description'],
-                e['File'],
-            ])
-    return send_file(file, as_attachment=True, download_name='Sharp Time Tracker.csv')
+    file = 'entries.xlsx'
+    wb.save(file)
+    return send_file(
+        file,
+        as_attachment=True,
+        download_name='Sharp Time Tracker.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
 
 @app.route('/weekly-download')
 def weekly_download():
@@ -400,13 +421,20 @@ def weekly_download():
     show_year = any(y != 2025 for y in years)
     labels = [_format_date(w, show_year) for w in weeks]
     names = sorted({name for w in weekly.values() for name in w.keys()})
-    file = 'weekly_report.csv'
-    with open(file, 'w', newline='') as f:
-        writer = csv.writer(f)
-        writer.writerow(['Week'] + names)
-        for week, label in zip(weeks, labels):
-            writer.writerow([label] + [weekly[week].get(name, 0) for name in names])
-    return send_file(file, as_attachment=True)
+    from openpyxl import Workbook
+    wb = Workbook()
+    ws = wb.active
+    ws.append(['Week'] + names)
+    for week, label in zip(weeks, labels):
+        ws.append([label] + [weekly[week].get(name, 0) for name in names])
+    file = 'weekly_report.xlsx'
+    wb.save(file)
+    return send_file(
+        file,
+        as_attachment=True,
+        download_name='weekly_report.xlsx',
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    )
 
 @app.route('/uploads/<path:filename>')
 def uploaded(filename):
